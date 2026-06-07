@@ -322,7 +322,7 @@ select option {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  width: min(72%, 330px);
+  width: min(44%, 230px);
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
@@ -331,11 +331,11 @@ select option {
 }
 
 .side-pot-top {
-  top: 34%;
+  top: 35%;
 }
 
 .side-pot-bottom {
-  top: 58%;
+  top: 60%;
 }
 
 .side-pot-stack span {
@@ -604,6 +604,15 @@ select option {
   display: flex;
   align-items: center;
   gap: 7px;
+}
+
+.disabled-field {
+  opacity: 0.56;
+}
+
+.disabled-field,
+.disabled-field input {
+  cursor: not-allowed;
 }
 
 .pot-winners input,
@@ -1029,7 +1038,7 @@ select option {
   }
 
   .side-pot-stack {
-    width: 72%;
+    width: 48%;
     gap: 3px;
   }
 
@@ -1039,11 +1048,11 @@ select option {
   }
 
   .side-pot-top {
-    top: 32%;
+    top: 35%;
   }
 
   .side-pot-bottom {
-    top: 59%;
+    top: 61%;
   }
 
   .seat-bet-chip {

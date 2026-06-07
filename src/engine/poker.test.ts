@@ -81,6 +81,32 @@ describe("Texas Hold'em engine", () => {
     expect(pots[2].eligiblePlayerIds).toEqual(["c"]);
   });
 
+  it("takes actual rake from main pot first and stops when the cap is reached", () => {
+    const hand = {
+      committed: { a: bb(10), b: bb(20), c: bb(30) },
+      foldedPlayerIds: [],
+      allInPlayerIds: ["a", "b", "c"]
+    } as unknown as HandState;
+
+    const pots = buildPots(hand, 10, bb(2));
+
+    expect(pots.map((pot) => pot.rake)).toEqual([bb(2), 0, 0]);
+    expect(pots.reduce((sum, pot) => sum + pot.rake, 0)).toBe(bb(2));
+  });
+
+  it("carries remaining rake cap from the main pot into side pots in order", () => {
+    const hand = {
+      committed: { a: bb(10), b: bb(20), c: bb(30) },
+      foldedPlayerIds: [],
+      allInPlayerIds: ["a", "b", "c"]
+    } as unknown as HandState;
+
+    const pots = buildPots(hand, 2, bb(1));
+
+    expect(pots.map((pot) => pot.rake)).toEqual([bb(0.6), bb(0.4), 0]);
+    expect(pots.reduce((sum, pot) => sum + pot.rake, 0)).toBe(bb(1));
+  });
+
   it("does not reopen betting to an already acted player after a short all-in raise", () => {
     let game = fixedButtonGame(["BTN", "SB", "BB", "UTG"]);
 
@@ -144,6 +170,24 @@ describe("Texas Hold'em engine", () => {
 
     expect(settled.lastSettlement?.winners).toHaveLength(2);
     expect(settled.lastSettlement?.winners.reduce((sum, row) => sum + row.amount, 0)).toBe(bb(2));
+  });
+
+  it("settles a split pot after subtracting rake from the pot", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    let game = createGame({ ...createDefaultConfig(), rakePercent: 10, rakeCap: bb(1) });
+    game = applyAction(game, { type: "call" });
+    game = applyAction(game, { type: "check" });
+    game = applyAction(game, { type: "check" });
+    game = applyAction(game, { type: "check" });
+    game = applyAction(game, { type: "check" });
+    game = applyAction(game, { type: "check" });
+    game = applyAction(game, { type: "check" });
+    game = applyAction(game, { type: "check" });
+
+    const settled = settlePots(game, { "pot-0": ["p-1", "p-2"] });
+
+    expect(settled.lastSettlement?.rake).toBe(bb(0.2));
+    expect(settled.lastSettlement?.winners.map((row) => row.amount)).toEqual([bb(0.9), bb(0.9)]);
   });
 
   it("resets stacks each hand in fixed stack mode while keeping profit", () => {

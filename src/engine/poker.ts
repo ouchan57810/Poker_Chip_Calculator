@@ -557,12 +557,11 @@ function buildPotsFromState(
     previous = level;
   }
 
-  const total = grossPots.reduce((sum, pot) => sum + pot.amount, 0);
-  const rakeTotal = Math.min(Math.round(total * (rakePercent / 100)), rakeCap);
-  let allocated = 0;
-  return grossPots.map((pot, index) => {
-    const rake = index === grossPots.length - 1 ? rakeTotal - allocated : Math.round(rakeTotal * (pot.amount / Math.max(1, total)));
-    allocated += rake;
+  let remainingRakeCap = Math.max(0, rakeCap);
+  return grossPots.map((pot) => {
+    const naturalRake = Math.max(0, Math.round(pot.amount * (Math.max(0, rakePercent) / 100)));
+    const rake = Math.min(naturalRake, remainingRakeCap);
+    remainingRakeCap -= rake;
     return { ...pot, rake };
   });
 }

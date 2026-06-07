@@ -32,9 +32,27 @@ describe("App", () => {
     expect(screen.getByText("スタックを設定[bb]")).toBeInTheDocument();
     expect(screen.getByText("この調整を収支にも反映する")).toBeInTheDocument();
     expect(screen.getByText("スタックに反映")).toBeInTheDocument();
+    expect(screen.getByLabelText("スタックを設定[bb]")).toBeEnabled();
+    expect(screen.getByLabelText("この調整を収支にも反映する")).toBeEnabled();
+    expect(screen.getByText("スタックに反映")).toBeEnabled();
     expect(screen.getByText("離席")).toBeInTheDocument();
     expect(screen.queryByText("スタックを実行")).not.toBeInTheDocument();
     expect(screen.queryByText("離脱")).not.toBeInTheDocument();
+  });
+
+  it("disables stack editing controls in fixed stack mode", () => {
+    localStorage.clear();
+    render(<App />);
+
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "fixed" } });
+    fireEvent.click(screen.getByText("ゲーム開始"));
+    fireEvent.click(screen.getAllByTitle("プレイヤー操作")[0]);
+
+    expect(screen.getByLabelText("スタックを設定[bb]")).toBeDisabled();
+    expect(screen.getByLabelText("この調整を収支にも反映する")).toBeDisabled();
+    expect(screen.getByText("スタックに反映")).toBeDisabled();
+    expect(screen.getByText("休憩")).toBeEnabled();
+    expect(screen.getByText("離席")).toBeEnabled();
   });
 
   it("shows the revised undo label and current plus previous history panes", () => {

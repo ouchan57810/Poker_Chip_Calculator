@@ -376,7 +376,9 @@ function PlayerDialog({
   const [adjustProfit, setAdjustProfit] = useState(false);
   const canSitOut = player.status === "active" && !player.pendingRemoval;
   const canReturn = player.status === "sittingOut" && !player.pendingRemoval;
+  const stackEditingDisabled = game.config.mode === "fixed";
   const applyStack = () => {
+    if (stackEditingDisabled) return;
     mutateGame((current) => adjustStack(current, player.id, parseBb(stackText), adjustProfit));
     close();
   };
@@ -389,15 +391,15 @@ function PlayerDialog({
             <X size={16} />
           </button>
         </div>
-        <label>
+        <label className={stackEditingDisabled ? "disabled-field" : ""}>
           <span>スタックを設定[bb]</span>
-          <input type="number" min="0" step="0.1" value={stackText} onChange={(event) => setStackText(event.target.value)} />
+          <input type="number" min="0" step="0.1" value={stackText} disabled={stackEditingDisabled} onChange={(event) => setStackText(event.target.value)} />
         </label>
-        <label className="wide-check">
-          <input type="checkbox" checked={adjustProfit} onChange={(event) => setAdjustProfit(event.target.checked)} />
+        <label className={`wide-check ${stackEditingDisabled ? "disabled-field" : ""}`}>
+          <input type="checkbox" checked={adjustProfit} disabled={stackEditingDisabled} onChange={(event) => setAdjustProfit(event.target.checked)} />
           この調整を収支にも反映する
         </label>
-        <button className="primary-button" onClick={applyStack}>スタックに反映</button>
+        <button className="primary-button" disabled={stackEditingDisabled} onClick={applyStack}>スタックに反映</button>
         <div className="dialog-actions">
           <button disabled={!canReturn} onClick={() => { mutateGame((current) => requestPlayerStatus(current, player.id, "active")); close(); }}>復帰</button>
           <button disabled={!canSitOut} onClick={() => { mutateGame((current) => requestPlayerStatus(current, player.id, "sittingOut")); close(); }}>休憩</button>
@@ -712,6 +714,39 @@ interface SeatLayout {
   betY: number;
 }
 
+const denseBetPositions: Record<number, { x: number; y: number }[]> = {
+  7: [
+    { x: 50, y: 26 },
+    { x: 65, y: 34 },
+    { x: 67, y: 52 },
+    { x: 58, y: 71 },
+    { x: 42, y: 71 },
+    { x: 33, y: 52 },
+    { x: 35, y: 34 }
+  ],
+  8: [
+    { x: 50, y: 26 },
+    { x: 65, y: 34 },
+    { x: 68, y: 50 },
+    { x: 62, y: 69 },
+    { x: 50, y: 74 },
+    { x: 38, y: 69 },
+    { x: 32, y: 50 },
+    { x: 35, y: 34 }
+  ],
+  9: [
+    { x: 50, y: 26 },
+    { x: 62, y: 32 },
+    { x: 69, y: 47 },
+    { x: 65, y: 65 },
+    { x: 56, y: 74 },
+    { x: 44, y: 74 },
+    { x: 35, y: 65 },
+    { x: 31, y: 47 },
+    { x: 38, y: 32 }
+  ]
+};
+
 function seatLayout(index: number, count: number): SeatLayout {
   const angle = -90 + (360 / count) * index;
   const dense = count >= 7;
@@ -721,7 +756,8 @@ function seatLayout(index: number, count: number): SeatLayout {
   const radialY = Math.sin((angle * Math.PI) / 180);
   const x = 50 + radiusX * radialX;
   const y = 50 + radiusY * radialY;
-  return fromSeatCenter(x, y, dense ? 20 : 16);
+  const denseBet = denseBetPositions[count]?.[index];
+  return denseBet ? { x, y, betX: denseBet.x, betY: denseBet.y } : fromSeatCenter(x, y, 22);
 }
 
 function fromSeatCenter(x: number, y: number, betInset: number): SeatLayout {
