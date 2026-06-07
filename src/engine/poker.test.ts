@@ -107,6 +107,24 @@ describe("Texas Hold'em engine", () => {
 
     expect(game.hand?.street).toBe("complete");
     expect(game.lastSettlement?.winners).toEqual([{ potLabel: "Main Pot", playerId: "p-2", amount: bb(1.5) }]);
+    expect(game.players.find((player) => player.id === "p-1")?.profit).toBe(-bb(0.5));
+    expect(game.players.find((player) => player.id === "p-2")?.profit).toBe(bb(0.5));
+  });
+
+  it("keeps profit unchanged during betting and updates it only at settlement", () => {
+    let game = fixedButtonGame();
+
+    expect(game.players.map((player) => player.profit)).toEqual([0, 0]);
+    game = applyAction(game, { type: "call" });
+    expect(game.players.map((player) => player.profit)).toEqual([0, 0]);
+    game = applyAction(game, { type: "check" });
+    game = applyAction(game, { type: "bet", amount: bb(1) });
+    expect(game.players.map((player) => player.profit)).toEqual([0, 0]);
+    game = applyAction(game, { type: "fold" });
+
+    expect(game.hand?.street).toBe("complete");
+    expect(game.players.find((player) => player.id === "p-1")?.profit).toBe(-bb(1));
+    expect(game.players.find((player) => player.id === "p-2")?.profit).toBe(bb(1));
   });
 
   it("settles a split pot and preserves the whole pot amount", () => {
@@ -136,7 +154,23 @@ describe("Texas Hold'em engine", () => {
     game = startNextHand(game);
 
     expect(game.players.find((player) => player.id === "p-2")!.stack).toBe(bb(100) - bb(0.5));
-    expect(game.players.find((player) => player.id === "p-2")!.profit).toBe(profitBefore - bb(0.5));
+    expect(game.players.find((player) => player.id === "p-2")!.profit).toBe(profitBefore);
+  });
+
+  it("stores the completed action log when starting the next hand", () => {
+    let game = fixedButtonGame();
+    game = applyAction(game, { type: "fold" });
+
+    expect(game.hand?.street).toBe("complete");
+    expect(game.hand?.actionLog.length).toBeGreaterThan(0);
+
+    const completedHandNumber = game.hand!.handNumber;
+    const completedLogIds = game.hand!.actionLog.map((entry) => entry.id);
+    game = startNextHand(game);
+
+    expect(game.previousHandLog?.handNumber).toBe(completedHandNumber);
+    expect(game.previousHandLog?.entries.map((entry) => entry.id)).toEqual(completedLogIds);
+    expect(game.hand?.handNumber).toBe(completedHandNumber + 1);
   });
 
   it("adds, removes, and adjusts players without accidental profit changes", () => {
@@ -148,10 +182,10 @@ describe("Texas Hold'em engine", () => {
 
     game = adjustStack(game, "p-1", bb(125), false);
     expect(game.players.find((player) => player.id === "p-1")?.stack).toBe(bb(125));
-    expect(game.players.find((player) => player.id === "p-1")?.profit).toBe(-bb(0.5));
+    expect(game.players.find((player) => player.id === "p-1")?.profit).toBe(0);
 
     game = adjustStack(game, "p-1", bb(100), true);
-    expect(game.players.find((player) => player.id === "p-1")?.profit).toBe(-bb(25.5));
+    expect(game.players.find((player) => player.id === "p-1")?.profit).toBe(-bb(25));
 
     game = removePlayerFromGame(game, "p-3");
     expect(game.players.some((player) => player.id === "p-3")).toBe(false);

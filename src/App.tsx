@@ -1,5 +1,5 @@
-import { ChevronRight, LogOut, MoreHorizontal, Play, Plus, Settings, Trash2, Undo2, X } from "lucide-react";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { ChevronRight, MoreHorizontal, Play, Plus, Settings, Trash2, X } from "lucide-react";
+import { useEffect, useState, type CSSProperties } from "react";
 import {
   addPlayerToGame,
   adjustStack,
@@ -15,7 +15,7 @@ import {
 } from "./engine/poker";
 import { BB_UNIT, formatBb, parseBb, toBbNumber } from "./engine/money";
 import { clearStoredGame, loadStoredGame, saveStoredGame } from "./engine/storage";
-import { ActionLogEntry, GameConfig, GameState, PlayerState, Street, TabKey } from "./engine/types";
+import { ActionLogEntry, GameConfig, GameState, PlayerState, ProfitSnapshot, Street, TabKey } from "./engine/types";
 
 const streetLabels: Record<Street, string> = {
   preflop: "Preflop",
@@ -45,7 +45,7 @@ const raiseShortcuts = [
 ] as const;
 
 const modeDescriptions: Record<GameConfig["mode"], string> = {
-  cash: "Normal: スタックはハンドごとに増減し、収支も連動して記録します。",
+  cash: "Normal: スタックはハンドごとに増減します。",
   fixed: "スタック固定: 各ハンド開始時に設定スタックへ戻し、収支だけを累積します。"
 };
 
@@ -54,6 +54,7 @@ export default function App() {
   const [game, setGame] = useState<GameState | undefined>(() => loadStoredGame());
   const [tab, setTab] = useState<TabKey>("table");
   const [undoStack, setUndoStack] = useState<GameState[]>([]);
+  const [confirmEndOpen, setConfirmEndOpen] = useState(false);
 
   useEffect(() => {
     if (!game) return;
@@ -82,6 +83,7 @@ export default function App() {
   const endGame = () => {
     clearStoredGame();
     setUndoStack([]);
+    setConfirmEndOpen(false);
     setGame(undefined);
   };
 
@@ -94,6 +96,14 @@ export default function App() {
       if (!current) return current;
       setUndoStack((stack) => [current, ...stack].slice(0, 20));
       return mutator(current);
+    });
+  };
+
+  const advanceHand = () => {
+    setGame((current) => {
+      if (!current) return current;
+      setUndoStack([]);
+      return startNextHand(current);
     });
   };
 
@@ -112,18 +122,18 @@ export default function App() {
           <span className="eyebrow">Hand {game.handNumber || 1}</span>
           <h1>{game.hand ? streetLabels[game.hand.street] : "Poker Chip Calculator"}</h1>
         </div>
-        <div className="header-actions">
-          <button className="icon-button" onClick={undo} disabled={undoStack.length === 0} title="1つ戻る">
-            <Undo2 size={18} />
+        <div className="header-actions header-stack">
+          <button className="text-button" disabled={game.players.length >= 9} onClick={() => mutateGame((current) => addPlayerToGame(current))}>
+            人数追加
           </button>
-          <button className="icon-button danger" onClick={endGame} title="ゲーム終了">
-            <LogOut size={18} />
+          <button className="text-button danger" onClick={() => setConfirmEndOpen(true)}>
+            ゲーム終了
           </button>
         </div>
       </header>
 
       <section className="content-panel">
-        {tab === "table" && <TableView game={game} mutateGame={mutateGame} />}
+        {tab === "table" && <TableView game={game} mutateGame={mutateGame} advanceHand={advanceHand} undo={undo} canUndo={undoStack.length > 0} />}
         {tab === "history" && <HistoryView game={game} />}
         {tab === "graph" && <GraphView game={game} />}
       </section>
@@ -133,6 +143,7 @@ export default function App() {
         <TabButton active={tab === "history"} onClick={() => setTab("history")} label="アクション履歴" />
         <TabButton active={tab === "graph"} onClick={() => setTab("graph")} label="収支グラフ" />
       </nav>
+      {confirmEndOpen && <EndGameDialog onCancel={() => setConfirmEndOpen(false)} onConfirm={endGame} />}
     </main>
   );
 }
@@ -160,27 +171,27 @@ function SetupScreen({
         </div>
 
         <div className="setup-grid">
-          <label>
+          <label className="mode-field">
             <span>ゲームモード</span>
             <select value={config.mode} onChange={(event) => update({ mode: event.target.value as GameConfig["mode"] })}>
               <option value="cash">Normal</option>
               <option value="fixed">スタック固定</option>
             </select>
+            <p className="mode-description">{modeDescriptions[config.mode]}</p>
           </label>
-          <label>
+          <label className="stack-field">
             <span>スタック[bb]</span>
             <input type="number" min="0" step="0.1" value={toBbNumber(config.startingStack)} onChange={(event) => update({ startingStack: parseBb(event.target.value) })} />
           </label>
-          <label>
+          <label className="rake-field">
             <span>レーキ[%]</span>
             <input type="number" min="0" step="0.1" value={config.rakePercent} onChange={(event) => update({ rakePercent: Math.max(0, Number(event.target.value) || 0) })} />
           </label>
-          <label>
+          <label className="rake-cap-field">
             <span>レーキキャップ[bb]</span>
             <input type="number" min="0" step="0.1" value={toBbNumber(config.rakeCap)} onChange={(event) => update({ rakeCap: parseBb(event.target.value) })} />
           </label>
         </div>
-        <p className="mode-description">{modeDescriptions[config.mode]}</p>
 
         <div className="players-editor">
           <div className="section-head">
@@ -235,35 +246,74 @@ function SetupScreen({
   );
 }
 
-function TableView({ game, mutateGame }: { game: GameState; mutateGame: (mutator: (current: GameState) => GameState) => void }) {
+function EndGameDialog({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+  return (
+    <div className="dialog-backdrop" role="dialog" aria-modal="true">
+      <div className="confirm-dialog">
+        <div>
+          <span className="eyebrow">End Game</span>
+          <h2>本当に終了しますか？</h2>
+        </div>
+        <p>現在のゲーム状態をリセットして設定画面に戻ります。</p>
+        <div className="dialog-actions">
+          <button onClick={onCancel}>キャンセル</button>
+          <button className="danger-action" onClick={onConfirm}>終了する</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TableView({
+  game,
+  mutateGame,
+  advanceHand,
+  undo,
+  canUndo
+}: {
+  game: GameState;
+  mutateGame: (mutator: (current: GameState) => GameState) => void;
+  advanceHand: () => void;
+  undo: () => void;
+  canUndo: boolean;
+}) {
   const hand = game.hand;
   const displayPots = hand?.displayPots ?? [];
-  const totalPot = displayPots.reduce((sum, pot) => sum + pot.amount - pot.rake, 0);
+  const mainPot = displayPots[0];
+  const sidePots = displayPots.slice(1);
+  const topSidePots = sidePots.length >= 5 ? sidePots.slice(0, Math.max(0, sidePots.length - 4)) : [];
+  const bottomSidePots = sidePots.length >= 5 ? sidePots.slice(Math.max(0, sidePots.length - 4)) : sidePots;
   return (
     <div className="table-layout">
       <div className="poker-table">
         <div className="felt">
           <div className="pot-display">
             <span>Pot</span>
-            <strong>{formatBb(totalPot)}</strong>
+            <strong>{formatBb(mainPot ? mainPot.amount - mainPot.rake : 0)}</strong>
           </div>
-          <div className="side-pot-stack">
-            {displayPots.map((pot) => (
+          {topSidePots.length > 0 && (
+            <div className="side-pot-stack side-pot-top">
+              {topSidePots.map((pot) => (
+                <span key={pot.id}>{pot.label}: {formatBb(pot.amount - pot.rake)}</span>
+              ))}
+            </div>
+          )}
+          {bottomSidePots.length > 0 && (
+            <div className="side-pot-stack side-pot-bottom">
+              {bottomSidePots.map((pot) => (
               <span key={pot.id}>{pot.label}: {formatBb(pot.amount - pot.rake)}</span>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
           {game.players.map((player, index) => (
             <Seat key={player.id} player={player} index={index} count={game.players.length} game={game} mutateGame={mutateGame} />
           ))}
         </div>
       </div>
       <div className="right-rail">
-        <button className="small-button add-ingame" disabled={game.players.length >= 9} onClick={() => mutateGame((current) => addPlayerToGame(current))}>
-          <Plus size={16} /> 途中参加
-        </button>
-        {hand?.street === "showdown" && <ShowdownPanel game={game} mutateGame={mutateGame} />}
-        {hand?.street === "complete" && <ResultPanel game={game} mutateGame={mutateGame} />}
-        {hand && !["showdown", "complete"].includes(hand.street) && <ActionPanel game={game} mutateGame={mutateGame} />}
+        {hand?.street === "showdown" && <ShowdownModal game={game} mutateGame={mutateGame} />}
+        {hand?.street === "complete" && <ResultModal game={game} advanceHand={advanceHand} />}
+        {hand && !["showdown", "complete"].includes(hand.street) && <ActionPanel game={game} mutateGame={mutateGame} undo={undo} canUndo={canUndo} />}
         {!hand && <div className="notice">参加中のプレイヤーが2人以上になると開始できます。</div>}
       </div>
     </div>
@@ -285,24 +335,17 @@ function Seat({
 }) {
   const [open, setOpen] = useState(false);
   const hand = game.hand;
-  const angle = -90 + (360 / count) * index;
-  const dense = count >= 7;
-  const radiusX = dense ? 38 : 36;
-  const radiusY = dense ? 42 : 39;
-  const x = 50 + radiusX * Math.cos((angle * Math.PI) / 180);
-  const y = 50 + radiusY * Math.sin((angle * Math.PI) / 180);
-  const markerX = 50 + (radiusX - 11) * Math.cos((angle * Math.PI) / 180);
-  const markerY = 50 + (radiusY - 10) * Math.sin((angle * Math.PI) / 180);
+  const layout = seatLayout(index, count);
   const isCurrent = hand?.currentActorId === player.id;
   const isFolded = hand?.foldedPlayerIds.includes(player.id);
-  const isAllIn = hand?.allInPlayerIds.includes(player.id);
   const position = hand ? positionLabel(game, player) : "-";
   const streetBet = hand?.streetBets[player.id] ?? 0;
   const isButton = hand?.buttonSeat === player.seat;
   return (
     <>
-      {isButton && <span className="dealer-marker" style={{ left: `${markerX}%`, top: `${markerY}%` }}>D</span>}
-      <article className={`seat ${isCurrent ? "current" : ""} ${isFolded ? "folded" : ""}`} style={{ left: `${x}%`, top: `${y}%` }}>
+      {streetBet > 0 && <span className="seat-bet-chip" style={{ left: `${layout.betX}%`, top: `${layout.betY}%` }}>{formatBb(streetBet)}</span>}
+      <article className={`seat ${isCurrent ? "current" : ""} ${isFolded ? "folded" : ""}`} style={{ left: `${layout.x}%`, top: `${layout.y}%` }}>
+        {isButton && <span className="dealer-marker">D</span>}
         <button className="seat-menu-button" onClick={() => setOpen(true)} title="プレイヤー操作">
           <MoreHorizontal size={15} />
         </button>
@@ -311,16 +354,6 @@ function Seat({
         <div className="chip-row">
           <span>{formatBb(player.stack)}</span>
           <strong className={player.profit >= 0 ? "profit-plus" : "profit-minus"}>{formatBb(player.profit, true)}</strong>
-        </div>
-        <div className="bet-row">
-          <span>Bet</span>
-          <strong>{formatBb(streetBet)}</strong>
-        </div>
-        <div className="status-row">
-          {isAllIn && <em>All in</em>}
-          {player.status === "sittingOut" && <em>休憩</em>}
-          {player.pendingStatus && <em>次: {player.pendingStatus === "active" ? "復帰" : "休憩"}</em>}
-          {player.pendingRemoval && <em>離脱予定</em>}
         </div>
       </article>
       {open && <PlayerDialog player={player} game={game} mutateGame={mutateGame} close={() => setOpen(false)} />}
@@ -364,18 +397,28 @@ function PlayerDialog({
           <input type="checkbox" checked={adjustProfit} onChange={(event) => setAdjustProfit(event.target.checked)} />
           この調整を収支にも反映する
         </label>
-        <button className="primary-button" onClick={applyStack}>スタックを実行</button>
+        <button className="primary-button" onClick={applyStack}>スタックに反映</button>
         <div className="dialog-actions">
           <button disabled={!canReturn} onClick={() => { mutateGame((current) => requestPlayerStatus(current, player.id, "active")); close(); }}>復帰</button>
           <button disabled={!canSitOut} onClick={() => { mutateGame((current) => requestPlayerStatus(current, player.id, "sittingOut")); close(); }}>休憩</button>
-          <button className="danger-action" onClick={() => { mutateGame((current) => removePlayerFromGame(current, player.id)); close(); }}>離脱</button>
+          <button className="danger-action" onClick={() => { mutateGame((current) => removePlayerFromGame(current, player.id)); close(); }}>離席</button>
         </div>
       </div>
     </div>
   );
 }
 
-function ActionPanel({ game, mutateGame }: { game: GameState; mutateGame: (mutator: (current: GameState) => GameState) => void }) {
+function ActionPanel({
+  game,
+  mutateGame,
+  undo,
+  canUndo
+}: {
+  game: GameState;
+  mutateGame: (mutator: (current: GameState) => GameState) => void;
+  undo: () => void;
+  canUndo: boolean;
+}) {
   const available = deriveAvailableActions(game);
   const player = game.players.find((candidate) => candidate.id === available.playerId);
   const hand = game.hand!;
@@ -407,6 +450,7 @@ function ActionPanel({ game, mutateGame }: { game: GameState; mutateGame: (mutat
         <>
           <label className="range-row">
             <span>{available.canBet ? "Bet" : "Raise"} {formatBb(boundedAmount)}</span>
+            <button type="button" className="undo-text-button" onClick={undo} disabled={!canUndo}>一つ戻す</button>
             <input type="range" min={min} max={max} step={BB_UNIT / 10} value={boundedAmount} onChange={(event) => { setAmount(Number(event.target.value)); setSelectedShortcut("custom"); }} />
           </label>
           <div className="shortcut-grid">
@@ -422,8 +466,8 @@ function ActionPanel({ game, mutateGame }: { game: GameState; mutateGame: (mutat
 
       <div className="action-buttons">
         {available.canBet && <button className="bet-action" onClick={() => mutateGame((current) => applyAction(current, { type: "bet", amount: boundedAmount }))}>Bet</button>}
-        {available.canCheck && <button className="call-action" onClick={() => mutateGame((current) => applyAction(current, { type: "check" }))}>Check</button>}
         {available.canRaise && <button className="bet-action" onClick={() => mutateGame((current) => applyAction(current, { type: "raise", amount: boundedAmount }))}>Raise</button>}
+        {available.canCheck && <button className="call-action" onClick={() => mutateGame((current) => applyAction(current, { type: "check" }))}>Check</button>}
         {available.canCall && <button className="call-action" onClick={() => mutateGame((current) => applyAction(current, { type: "call" }))}>Call({formatBb(available.callAmount)})</button>}
         <button className="fold-action" disabled={!available.canFold} onClick={() => mutateGame((current) => applyAction(current, { type: "fold" }))}>Fold</button>
       </div>
@@ -431,101 +475,121 @@ function ActionPanel({ game, mutateGame }: { game: GameState; mutateGame: (mutat
   );
 }
 
-function ShowdownPanel({ game, mutateGame }: { game: GameState; mutateGame: (mutator: (current: GameState) => GameState) => void }) {
+function ShowdownModal({ game, mutateGame }: { game: GameState; mutateGame: (mutator: (current: GameState) => GameState) => void }) {
   const pots = game.hand?.settlementPots ?? [];
   const [selected, setSelected] = useState<Record<string, string[]>>(() => Object.fromEntries(pots.map((pot) => [pot.id, []])));
   const canSettle = pots.every((pot) => (selected[pot.id] ?? []).length > 0);
+  const hasSidePots = (game.hand?.displayPots.length ?? 0) > 1;
 
   useEffect(() => {
     setSelected(Object.fromEntries(pots.map((pot) => [pot.id, selected[pot.id] ?? []])));
   }, [pots.length]);
 
   return (
-    <div className="showdown-panel">
-      <div className="section-head">
-        <div>
-          <span className="eyebrow">Show Down</span>
-          <h2>Winner選択</h2>
-        </div>
-      </div>
-      {pots.length === 0 && <div className="notice">自動で獲得できるPotのみです。</div>}
-      {pots.map((pot) => (
-        <div className="pot-winners" key={pot.id}>
+    <div className="dialog-backdrop" role="dialog" aria-modal="true">
+      <div className="settlement-dialog">
+        <div className="section-head">
           <div>
-            <strong>{pot.label}</strong>
-            <span>{formatBb(pot.amount - pot.rake)} {pot.rake > 0 && `(Rake ${formatBb(pot.rake)})`}</span>
+            <span className="eyebrow">Show Down</span>
+            <h2>Winner選択</h2>
           </div>
-          {pot.eligiblePlayerIds.map((id) => {
-            const player = game.players.find((candidate) => candidate.id === id)!;
-            const checked = selected[pot.id]?.includes(id) ?? false;
-            return (
-              <label key={id}>
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(event) =>
-                    setSelected((current) => ({
-                      ...current,
-                      [pot.id]: event.target.checked ? [...(current[pot.id] ?? []), id] : (current[pot.id] ?? []).filter((item) => item !== id)
-                    }))
-                  }
-                />
-                {player.name}
-              </label>
-            );
-          })}
         </div>
-      ))}
-      <button className="primary-button" disabled={!canSettle} onClick={() => mutateGame((current) => settlePots(current, selected))}>
-        Potを移動 <ChevronRight size={18} />
-      </button>
+        <div className="settlement-scroll">
+          {pots.length === 0 && <div className="notice">自動で獲得できるPotのみです。</div>}
+          {pots.map((pot) => (
+            <div className="pot-winners" key={pot.id}>
+              <div>
+                <strong>{hasSidePots ? pot.label : "Pot"}</strong>
+                <span>{formatBb(pot.amount - pot.rake)} {pot.rake > 0 && `(Rake ${formatBb(pot.rake)})`}</span>
+              </div>
+              {pot.eligiblePlayerIds.map((id) => {
+                const player = game.players.find((candidate) => candidate.id === id)!;
+                const checked = selected[pot.id]?.includes(id) ?? false;
+                return (
+                  <label key={id}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(event) =>
+                        setSelected((current) => ({
+                          ...current,
+                          [pot.id]: event.target.checked ? [...(current[pot.id] ?? []), id] : (current[pot.id] ?? []).filter((item) => item !== id)
+                        }))
+                      }
+                    />
+                    {player.name}
+                  </label>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+        <button className="primary-button" disabled={!canSettle} onClick={() => mutateGame((current) => settlePots(current, selected))}>
+          Potを移動 <ChevronRight size={18} />
+        </button>
+      </div>
     </div>
   );
 }
 
-function ResultPanel({ game, mutateGame }: { game: GameState; mutateGame: (mutator: (current: GameState) => GameState) => void }) {
+function ResultModal({ game, advanceHand }: { game: GameState; advanceHand: () => void }) {
+  const hasSidePots = (game.hand?.displayPots.length ?? 0) > 1;
   return (
-    <div className="result-panel">
-      <span className="eyebrow">Result</span>
-      <h2>Hand {game.lastSettlement?.handNumber}</h2>
-      <div className="result-list">
-        {game.lastSettlement?.winners.map((row, index) => {
-          const player = game.players.find((candidate) => candidate.id === row.playerId);
-          return (
-            <div key={`${row.potLabel}-${row.playerId}-${index}`}>
-              <span>{row.potLabel}</span>
-              <strong>{player?.name ?? row.playerId}</strong>
-              <em>{formatBb(row.amount)}</em>
+    <div className="dialog-backdrop" role="dialog" aria-modal="true">
+      <div className="settlement-dialog">
+        <span className="eyebrow">Result</span>
+        <h2>Hand {game.lastSettlement?.handNumber}</h2>
+        <div className="settlement-scroll result-list">
+          {game.lastSettlement?.winners.map((row, index) => {
+            const player = game.players.find((candidate) => candidate.id === row.playerId);
+            const potLabel = hasSidePots ? row.potLabel : "Pot";
+            return (
+              <div key={`${row.potLabel}-${row.playerId}-${index}`}>
+                <span>{potLabel}</span>
+                <strong>{player?.name ?? row.playerId}</strong>
+                <em>{formatBb(row.amount)}</em>
+              </div>
+            );
+          })}
+          {game.lastSettlement && game.lastSettlement.rake > 0 && (
+            <div>
+              <span>Rake</span>
+              <strong>Table out</strong>
+              <em>{formatBb(game.lastSettlement.rake)}</em>
             </div>
-          );
-        })}
-        {game.lastSettlement && game.lastSettlement.rake > 0 && (
-          <div>
-            <span>Rake</span>
-            <strong>Table out</strong>
-            <em>{formatBb(game.lastSettlement.rake)}</em>
-          </div>
-        )}
+          )}
+        </div>
+        <button className="primary-button" onClick={advanceHand}>
+          次のハンド <ChevronRight size={18} />
+        </button>
       </div>
-      <button className="primary-button" onClick={() => mutateGame(startNextHand)}>
-        次のハンド <ChevronRight size={18} />
-      </button>
     </div>
   );
 }
 
 function HistoryView({ game }: { game: GameState }) {
-  const entries = game.hand?.actionLog ?? [];
-  const grouped = groupEntriesByStreet(entries);
   return (
     <div className="history-view">
+      <div className="history-scroll">
+        <HandHistorySection title="現在のアクション履歴" eyebrow={`Hand ${(game.hand?.handNumber ?? game.handNumber) || 1}`} entries={game.hand?.actionLog ?? []} />
+        <HandHistorySection title="1つ前のアクション履歴" eyebrow={game.previousHandLog ? `Hand ${game.previousHandLog.handNumber}` : "Previous Hand"} entries={game.previousHandLog?.entries ?? []} />
+      </div>
+    </div>
+  );
+}
+
+function HandHistorySection({ title, eyebrow, entries }: { title: string; eyebrow: string; entries: ActionLogEntry[] }) {
+  const grouped = groupEntriesByStreet(entries);
+  return (
+    <section className="history-section">
       <div className="section-head">
         <div>
-          <span className="eyebrow">Action Log</span>
-          <h2>現在のハンド</h2>
+          <span className="eyebrow">{eyebrow}</span>
+          <h2>{title}</h2>
         </div>
       </div>
       <div className="history-list">
+        {grouped.length === 0 && <div className="notice compact-notice">履歴はまだありません。</div>}
         {grouped.map(([street, rows]) => (
           <div className="history-street" key={street}>
             <div className="street-separator">{streetLabels[street]}</div>
@@ -540,16 +604,16 @@ function HistoryView({ game }: { game: GameState }) {
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
 function GraphView({ game }: { game: GameState }) {
   const width = 680;
   const height = 330;
-  const margin = { left: 58, right: 22, top: 20, bottom: 42 };
+  const margin = { left: 82, right: 24, top: 24, bottom: 54 };
   const players = game.players;
-  const snapshots = game.graph;
+  const snapshots = withOriginSnapshot(game);
   const values = snapshots.flatMap((snap) => Object.values(snap.profits));
   const maxAbs = Math.max(BB_UNIT, ...values.map((value) => Math.abs(value)));
   const niceAbs = niceCeil(maxAbs);
@@ -570,13 +634,13 @@ function GraphView({ game }: { game: GameState }) {
           <h2>収支グラフ</h2>
         </div>
       </div>
-      {snapshots.length === 0 ? (
+      {game.graph.length === 0 ? (
         <div className="notice">1ハンド終了後にグラフを表示します。</div>
       ) : (
         <>
           <svg className="profit-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="収支グラフ">
             <text className="axis-label" x={width / 2} y={height - 8} textAnchor="middle">Hand</text>
-            <text className="axis-label" x="16" y={height / 2} textAnchor="middle" transform={`rotate(-90 16 ${height / 2})`}>Profit(bb)</text>
+            <text className="axis-label" x="22" y={height / 2} textAnchor="middle" transform={`rotate(-90 22 ${height / 2})`}>Profit(bb)</text>
             <line className="axis-line" x1={margin.left} y1={height - margin.bottom} x2={width - margin.right} y2={height - margin.bottom} />
             <line className="axis-line" x1={margin.left} y1={margin.top} x2={margin.left} y2={height - margin.bottom} />
             {ticks.map((tick) => (
@@ -641,6 +705,39 @@ function positionClass(position: string): string {
   return "";
 }
 
+interface SeatLayout {
+  x: number;
+  y: number;
+  betX: number;
+  betY: number;
+}
+
+function seatLayout(index: number, count: number): SeatLayout {
+  const angle = -90 + (360 / count) * index;
+  const dense = count >= 7;
+  const radiusX = dense ? 38 : 36;
+  const radiusY = dense ? 40 : 39;
+  const radialX = Math.cos((angle * Math.PI) / 180);
+  const radialY = Math.sin((angle * Math.PI) / 180);
+  const x = 50 + radiusX * radialX;
+  const y = 50 + radiusY * radialY;
+  return fromSeatCenter(x, y, dense ? 20 : 16);
+}
+
+function fromSeatCenter(x: number, y: number, betInset: number): SeatLayout {
+  const vx = x - 50;
+  const vy = y - 50;
+  const length = Math.max(1, Math.hypot(vx, vy));
+  const radialX = vx / length;
+  const radialY = vy / length;
+  return {
+    x,
+    y,
+    betX: x - radialX * betInset,
+    betY: y - radialY * betInset
+  };
+}
+
 function groupEntriesByStreet(entries: ActionLogEntry[]): [Street, ActionLogEntry[]][] {
   const order: Street[] = ["preflop", "flop", "turn", "river", "showdown", "complete"];
   const map = new Map<Street, ActionLogEntry[]>();
@@ -648,6 +745,16 @@ function groupEntriesByStreet(entries: ActionLogEntry[]): [Street, ActionLogEntr
     map.set(entry.street, [...(map.get(entry.street) ?? []), entry]);
   }
   return order.filter((street) => map.has(street)).map((street) => [street, map.get(street)!]);
+}
+
+function withOriginSnapshot(game: GameState): ProfitSnapshot[] {
+  return [
+    {
+      handNumber: 0,
+      profits: Object.fromEntries(game.players.map((player) => [player.id, 0]))
+    },
+    ...game.graph
+  ];
 }
 
 function niceCeil(value: number): number {

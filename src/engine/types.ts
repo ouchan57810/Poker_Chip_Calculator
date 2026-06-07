@@ -33,6 +33,11 @@ export interface ActionLogEntry {
   amount?: number;
 }
 
+export interface HandActionLog {
+  handNumber: number;
+  entries: ActionLogEntry[];
+}
+
 export interface Pot {
   id: string;
   label: string;
@@ -56,6 +61,7 @@ export interface HandState {
   canRaisePlayerIds: string[];
   streetBets: Record<string, number>;
   committed: Record<string, number>;
+  handNet: Record<string, number>;
   currentBet: number;
   lastFullRaise: number;
   lastFullRaiseTo: number;
@@ -83,6 +89,7 @@ export interface GameState {
   buttonSeat: number;
   hand?: HandState;
   graph: ProfitSnapshot[];
+  previousHandLog?: HandActionLog;
   lastSettlement?: SettlementResult;
   lastHeartbeatAt: number;
 }

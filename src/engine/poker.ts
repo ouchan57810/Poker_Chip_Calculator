@@ -55,7 +55,16 @@ export function reviveGameState(raw: string): GameState | undefined {
   try {
     const parsed = JSON.parse(raw) as GameState;
     if (!parsed.players || !parsed.config || parsed.config.startingStack > bb(1000)) return undefined;
-    return parsed;
+    if (parsed.hand && !parsed.hand.handNet) return undefined;
+    return {
+      ...parsed,
+      previousHandLog: parsed.previousHandLog
+        ? {
+            handNumber: parsed.previousHandLog.handNumber,
+            entries: parsed.previousHandLog.entries ?? []
+          }
+        : undefined
+    };
   } catch {
     return undefined;
   }
@@ -84,6 +93,7 @@ export function startHand(game: GameState, buttonSeat = nextActiveSeat(game.play
   let nextPlayers = players;
   let streetBets = { ...blankAmounts };
   let committed = { ...blankAmounts };
+  let handNet = { ...blankAmounts };
   const actionLog: ActionLogEntry[] = [];
   const allInPlayerIds: string[] = [];
 
@@ -94,6 +104,7 @@ export function startHand(game: GameState, buttonSeat = nextActiveSeat(game.play
     nextPlayers = moveChips(nextPlayers, player.id, -amount);
     streetBets = { ...streetBets, [player.id]: amount };
     committed = { ...committed, [player.id]: amount };
+    handNet = { ...handNet, [player.id]: (handNet[player.id] ?? 0) - amount };
     if (amount > 0 && amount === player.stack) allInPlayerIds.push(player.id);
     actionLog.push(logEntry(handNumber, "preflop", player, positionForSeat(players, resolvedButton, player.seat), label, amount));
   };
@@ -119,6 +130,7 @@ export function startHand(game: GameState, buttonSeat = nextActiveSeat(game.play
     canRaisePlayerIds: activePlayerIds.filter((id) => !allInPlayerIds.includes(id)),
     streetBets,
     committed,
+    handNet,
     currentBet: Math.max(...Object.values(streetBets)),
     lastFullRaise: BB_UNIT,
     lastFullRaiseTo: Math.max(...Object.values(streetBets)),
@@ -142,7 +154,13 @@ export function startHand(game: GameState, buttonSeat = nextActiveSeat(game.play
 export function startNextHand(game: GameState): GameState {
   const nextPlayers = removePendingPlayers(applyPendingStatuses(game.players));
   const nextButton = nextActiveSeat(nextPlayers, game.buttonSeat);
-  return startHand({ ...game, players: nextPlayers, buttonSeat: nextButton, hand: undefined, lastSettlement: undefined }, nextButton);
+  const previousHandLog = game.hand
+    ? {
+        handNumber: game.hand.handNumber,
+        entries: [...game.hand.actionLog]
+      }
+    : game.previousHandLog;
+  return startHand({ ...game, players: nextPlayers, buttonSeat: nextButton, hand: undefined, previousHandLog, lastSettlement: undefined }, nextButton);
 }
 
 export function deriveAvailableActions(game: GameState): AvailableActions {
@@ -187,6 +205,7 @@ export function applyAction(game: GameState, action: PlayerAction): GameState {
     players = moveChips(players, player.id, -delta);
     nextHand.streetBets[player.id] = boundedTotal;
     nextHand.committed[player.id] = (nextHand.committed[player.id] ?? 0) + delta;
+    nextHand.handNet[player.id] = (nextHand.handNet[player.id] ?? 0) - delta;
     const updated = players.find((candidate) => candidate.id === player.id);
     if (updated && updated.stack === 0 && !nextHand.allInPlayerIds.includes(player.id)) {
       nextHand.allInPlayerIds.push(player.id);
@@ -452,6 +471,7 @@ export function advanceStreet(players: PlayerState[], hand: HandState, config: G
 function completeHand(game: GameState, sourceHand: HandState, winnersByPot: Record<string, string[]>): GameState {
   const hand = withFreshPots(sourceHand, game.config);
   let players = game.players;
+  const handNet = { ...hand.handNet };
   const winnerRows: SettlementResult["winners"] = [];
   let totalRake = 0;
   const order = orderedSeatsAfterButton(players, hand.buttonSeat);
@@ -470,12 +490,13 @@ function completeHand(game: GameState, sourceHand: HandState, winnersByPot: Reco
       remainder -= extra;
       const amount = base + extra;
       players = moveChips(players, winnerId, amount);
+      handNet[winnerId] = (handNet[winnerId] ?? 0) + amount;
       winnerRows.push({ potLabel: pot.label, playerId: winnerId, amount });
     }
   }
 
-  players = removePendingPlayers(players);
-  const completeHandState: HandState = { ...hand, street: "complete", currentActorId: undefined };
+  players = removePendingPlayers(applyHandNetToProfit(players, handNet));
+  const completeHandState: HandState = { ...hand, handNet, street: "complete", currentActorId: undefined };
   const graph = [
     ...game.graph,
     {
@@ -594,8 +615,12 @@ function livePlayerIds(hand: HandState): string[] {
 function moveChips(players: PlayerState[], playerId: string, delta: number): PlayerState[] {
   return players.map((player) => {
     if (player.id !== playerId) return player;
-    return { ...player, stack: Math.max(0, player.stack + delta), profit: player.profit + delta };
+    return { ...player, stack: Math.max(0, player.stack + delta) };
   });
+}
+
+function applyHandNetToProfit(players: PlayerState[], handNet: Record<string, number>): PlayerState[] {
+  return players.map((player) => ({ ...player, profit: player.profit + (handNet[player.id] ?? 0) }));
 }
 
 function applyPendingStatuses(players: PlayerState[]): PlayerState[] {
@@ -653,6 +678,7 @@ function cloneHand(hand: HandState): HandState {
     canRaisePlayerIds: [...hand.canRaisePlayerIds],
     streetBets: { ...hand.streetBets },
     committed: { ...hand.committed },
+    handNet: { ...hand.handNet },
     actionLog: [...hand.actionLog],
     pots: hand.pots.map(clonePot),
     displayPots: hand.displayPots.map(clonePot),
