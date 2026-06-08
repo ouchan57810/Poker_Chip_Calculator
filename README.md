@@ -1,2 +1,2 @@
 # codex
-repository for codex
+Poker Chip Calculator
