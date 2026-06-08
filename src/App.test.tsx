@@ -40,6 +40,63 @@ describe("App", () => {
     expect(screen.queryByText("離脱")).not.toBeInTheDocument();
   });
 
+  it("resets setup settings after ending a game", () => {
+    localStorage.clear();
+    render(<App />);
+
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "fixed" } });
+    fireEvent.change(screen.getByLabelText("スタック[bb]"), { target: { value: "40" } });
+    fireEvent.change(screen.getByLabelText("レーキ[%]"), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText("レーキキャップ[bb]"), { target: { value: "2" } });
+    fireEvent.change(screen.getByDisplayValue("Player 1"), { target: { value: "Alice" } });
+
+    fireEvent.click(screen.getByText("ゲーム開始"));
+    fireEvent.click(screen.getByText("ゲーム終了"));
+    fireEvent.click(screen.getByText("終了する"));
+
+    expect(screen.getByRole("combobox")).toHaveValue("cash");
+    expect(screen.getByLabelText("スタック[bb]")).toHaveValue(100);
+    expect(screen.getByLabelText("レーキ[%]")).toHaveValue(0);
+    expect(screen.getByLabelText("レーキキャップ[bb]")).toHaveValue(0);
+    expect(screen.getByDisplayValue("Player 1")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Player 2")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Alice")).not.toBeInTheDocument();
+  });
+
+  it("keeps player names non-empty in setup and game screens", () => {
+    localStorage.clear();
+    render(<App />);
+
+    const setupName = screen.getByDisplayValue("Player 1") as HTMLInputElement;
+    fireEvent.change(setupName, { target: { value: "" } });
+    expect(setupName.value).toBe("Player 1");
+
+    fireEvent.click(screen.getByText("ゲーム開始"));
+    const gameName = screen.getAllByDisplayValue("Player 1")[0] as HTMLInputElement;
+    fireEvent.change(gameName, { target: { value: "" } });
+    expect(gameName.value).toBe("Player 1");
+  });
+
+  it("allows setup number fields to be cleared before typing a replacement", () => {
+    localStorage.clear();
+    render(<App />);
+
+    const stackInput = screen.getByLabelText("スタック[bb]") as HTMLInputElement;
+    const rakeInput = screen.getByLabelText("レーキ[%]") as HTMLInputElement;
+    const rakeCapInput = screen.getByLabelText("レーキキャップ[bb]") as HTMLInputElement;
+
+    fireEvent.change(stackInput, { target: { value: "" } });
+    fireEvent.change(stackInput, { target: { value: "25" } });
+    fireEvent.change(rakeInput, { target: { value: "" } });
+    fireEvent.change(rakeInput, { target: { value: "4" } });
+    fireEvent.change(rakeCapInput, { target: { value: "" } });
+    fireEvent.change(rakeCapInput, { target: { value: "3" } });
+
+    expect(stackInput.value).toBe("25");
+    expect(rakeInput.value).toBe("4");
+    expect(rakeCapInput.value).toBe("3");
+  });
+
   it("disables stack editing controls in fixed stack mode", () => {
     localStorage.clear();
     render(<App />);

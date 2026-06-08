@@ -49,6 +49,8 @@ const modeDescriptions: Record<GameConfig["mode"], string> = {
   fixed: "スタック固定: 各ハンド開始時に設定スタックへ戻し、収支だけを累積します。"
 };
 
+const isValidPlayerName = (name: string) => name.trim().length > 0;
+
 export default function App() {
   const [config, setConfig] = useState<GameConfig>(() => createDefaultConfig());
   const [game, setGame] = useState<GameState | undefined>(() => loadStoredGame());
@@ -82,7 +84,9 @@ export default function App() {
 
   const endGame = () => {
     clearStoredGame();
+    setConfig(createDefaultConfig());
     setUndoStack([]);
+    setTab("table");
     setConfirmEndOpen(false);
     setGame(undefined);
   };
@@ -159,6 +163,35 @@ function SetupScreen({
 }) {
   const update = (patch: Partial<GameConfig>) => setConfig((current) => ({ ...current, ...patch }));
   const playerCount = config.playerNames.length;
+  const [stackText, setStackText] = useState(String(toBbNumber(config.startingStack)));
+  const [rakeText, setRakeText] = useState(String(config.rakePercent));
+  const [rakeCapText, setRakeCapText] = useState(String(toBbNumber(config.rakeCap)));
+
+  const updateStackText = (value: string) => {
+    setStackText(value);
+    if (value === "") return;
+    update({ startingStack: parseBb(value) });
+  };
+
+  const updateRakeText = (value: string) => {
+    setRakeText(value);
+    if (value === "") return;
+    const next = Number(value);
+    if (Number.isFinite(next)) update({ rakePercent: Math.max(0, next) });
+  };
+
+  const updateRakeCapText = (value: string) => {
+    setRakeCapText(value);
+    if (value === "") return;
+    update({ rakeCap: parseBb(value) });
+  };
+
+  const restoreEmptyNumberFields = () => {
+    if (stackText === "") setStackText(String(toBbNumber(config.startingStack)));
+    if (rakeText === "") setRakeText(String(config.rakePercent));
+    if (rakeCapText === "") setRakeCapText(String(toBbNumber(config.rakeCap)));
+  };
+
   return (
     <main className="setup-shell">
       <section className="setup-board">
@@ -181,15 +214,15 @@ function SetupScreen({
           </label>
           <label className="stack-field">
             <span>スタック[bb]</span>
-            <input type="number" min="0" step="0.1" value={toBbNumber(config.startingStack)} onChange={(event) => update({ startingStack: parseBb(event.target.value) })} />
+            <input type="number" min="0" step="0.1" value={stackText} onBlur={restoreEmptyNumberFields} onChange={(event) => updateStackText(event.target.value)} />
           </label>
           <label className="rake-field">
             <span>レーキ[%]</span>
-            <input type="number" min="0" step="0.1" value={config.rakePercent} onChange={(event) => update({ rakePercent: Math.max(0, Number(event.target.value) || 0) })} />
+            <input type="number" min="0" step="0.1" value={rakeText} onBlur={restoreEmptyNumberFields} onChange={(event) => updateRakeText(event.target.value)} />
           </label>
           <label className="rake-cap-field">
             <span>レーキキャップ[bb]</span>
-            <input type="number" min="0" step="0.1" value={toBbNumber(config.rakeCap)} onChange={(event) => update({ rakeCap: parseBb(event.target.value) })} />
+            <input type="number" min="0" step="0.1" value={rakeCapText} onBlur={restoreEmptyNumberFields} onChange={(event) => updateRakeCapText(event.target.value)} />
           </label>
         </div>
 
@@ -212,8 +245,11 @@ function SetupScreen({
               <div className="player-name-row" key={index}>
                 <span>{index + 1}</span>
                 <input
+                  required
+                  minLength={1}
                   value={name}
                   onChange={(event) =>
+                    isValidPlayerName(event.target.value) &&
                     setConfig((current) => ({
                       ...current,
                       playerNames: current.playerNames.map((item, itemIndex) => (itemIndex === index ? event.target.value : item))
@@ -350,7 +386,16 @@ function Seat({
           <MoreHorizontal size={15} />
         </button>
         <span className={`position ${positionClass(position)}`}>{position}</span>
-        <input className="name-input" value={player.name} onChange={(event) => mutateGame((current) => updatePlayerName(current, player.id, event.target.value))} />
+        <input
+          className="name-input"
+          required
+          minLength={1}
+          value={player.name}
+          onChange={(event) => {
+            if (!isValidPlayerName(event.target.value)) return;
+            mutateGame((current) => updatePlayerName(current, player.id, event.target.value));
+          }}
+        />
         <div className="chip-row">
           <span>{formatBb(player.stack)}</span>
           <strong className={player.profit >= 0 ? "profit-plus" : "profit-minus"}>{formatBb(player.profit, true)}</strong>
