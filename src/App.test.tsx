@@ -63,18 +63,31 @@ describe("App", () => {
     expect(screen.queryByDisplayValue("Alice")).not.toBeInTheDocument();
   });
 
-  it("keeps player names non-empty in setup and game screens", () => {
+  it("warns and restores player names that are left empty in setup and game screens", () => {
     localStorage.clear();
     render(<App />);
 
     const setupName = screen.getByDisplayValue("Player 1") as HTMLInputElement;
+    fireEvent.focus(setupName);
     fireEvent.change(setupName, { target: { value: "" } });
+    expect(setupName.value).toBe("");
+    fireEvent.blur(setupName);
     expect(setupName.value).toBe("Player 1");
+    expect(screen.getByRole("alert")).toHaveTextContent("プレイヤー名は1文字以上で入力してください。");
+
+    fireEvent.focus(setupName);
+    fireEvent.change(setupName, { target: { value: "Alice" } });
+    fireEvent.blur(setupName);
+    expect(setupName.value).toBe("Alice");
 
     fireEvent.click(screen.getByText("ゲーム開始"));
-    const gameName = screen.getAllByDisplayValue("Player 1")[0] as HTMLInputElement;
-    fireEvent.change(gameName, { target: { value: "" } });
-    expect(gameName.value).toBe("Player 1");
+    const gameName = screen.getAllByDisplayValue("Alice")[0] as HTMLInputElement;
+    fireEvent.focus(gameName);
+    fireEvent.change(gameName, { target: { value: "   " } });
+    expect(gameName.value).toBe("   ");
+    fireEvent.blur(gameName);
+    expect(gameName.value).toBe("Alice");
+    expect(screen.getByRole("alert")).toHaveTextContent("プレイヤー名は1文字以上で入力してください。");
   });
 
   it("allows setup number fields to be cleared before typing a replacement", () => {

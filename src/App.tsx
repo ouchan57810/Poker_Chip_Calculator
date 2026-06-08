@@ -50,6 +50,7 @@ const modeDescriptions: Record<GameConfig["mode"], string> = {
 };
 
 const isValidPlayerName = (name: string) => name.trim().length > 0;
+const playerNameWarning = "プレイヤー名は1文字以上で入力してください。";
 
 export default function App() {
   const [config, setConfig] = useState<GameConfig>(() => createDefaultConfig());
@@ -166,6 +167,15 @@ function SetupScreen({
   const [stackText, setStackText] = useState(String(toBbNumber(config.startingStack)));
   const [rakeText, setRakeText] = useState(String(config.rakePercent));
   const [rakeCapText, setRakeCapText] = useState(String(toBbNumber(config.rakeCap)));
+  const [playerNameDrafts, setPlayerNameDrafts] = useState(() => config.playerNames);
+  const [playerNameBaselines, setPlayerNameBaselines] = useState(() => config.playerNames);
+  const [nameWarningIndex, setNameWarningIndex] = useState<number | undefined>();
+
+  useEffect(() => {
+    setPlayerNameDrafts(config.playerNames);
+    setPlayerNameBaselines(config.playerNames);
+    setNameWarningIndex((current) => (current !== undefined && current >= config.playerNames.length ? undefined : current));
+  }, [config.playerNames.length]);
 
   const updateStackText = (value: string) => {
     setStackText(value);
@@ -190,6 +200,34 @@ function SetupScreen({
     if (stackText === "") setStackText(String(toBbNumber(config.startingStack)));
     if (rakeText === "") setRakeText(String(config.rakePercent));
     if (rakeCapText === "") setRakeCapText(String(toBbNumber(config.rakeCap)));
+  };
+
+  const beginPlayerNameEdit = (index: number) => {
+    setPlayerNameBaselines((current) => current.map((item, itemIndex) => (itemIndex === index ? config.playerNames[index] : item)));
+    if (nameWarningIndex === index) setNameWarningIndex(undefined);
+  };
+
+  const updatePlayerNameDraft = (index: number, value: string) => {
+    setPlayerNameDrafts((current) => current.map((item, itemIndex) => (itemIndex === index ? value : item)));
+    if (nameWarningIndex === index) setNameWarningIndex(undefined);
+  };
+
+  const finishPlayerNameEdit = (index: number) => {
+    const draft = playerNameDrafts[index] ?? config.playerNames[index];
+    const baseline = playerNameBaselines[index] ?? config.playerNames[index];
+    const nextName = draft.trim();
+    if (!isValidPlayerName(nextName)) {
+      setPlayerNameDrafts((current) => current.map((item, itemIndex) => (itemIndex === index ? baseline : item)));
+      setNameWarningIndex(index);
+      return;
+    }
+
+    setNameWarningIndex(undefined);
+    setPlayerNameDrafts((current) => current.map((item, itemIndex) => (itemIndex === index ? nextName : item)));
+    setConfig((current) => ({
+      ...current,
+      playerNames: current.playerNames.map((item, itemIndex) => (itemIndex === index ? nextName : item))
+    }));
   };
 
   return (
@@ -247,14 +285,15 @@ function SetupScreen({
                 <input
                   required
                   minLength={1}
-                  value={name}
-                  onChange={(event) =>
-                    isValidPlayerName(event.target.value) &&
-                    setConfig((current) => ({
-                      ...current,
-                      playerNames: current.playerNames.map((item, itemIndex) => (itemIndex === index ? event.target.value : item))
-                    }))
-                  }
+                  aria-invalid={nameWarningIndex === index}
+                  aria-describedby={nameWarningIndex === index ? `setup-player-name-warning-${index}` : undefined}
+                  value={playerNameDrafts[index] ?? name}
+                  onFocus={() => beginPlayerNameEdit(index)}
+                  onChange={(event) => updatePlayerNameDraft(index, event.target.value)}
+                  onBlur={() => finishPlayerNameEdit(index)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") event.currentTarget.blur();
+                  }}
                 />
                 <button
                   className="icon-button"
@@ -269,6 +308,11 @@ function SetupScreen({
                 >
                   <Trash2 size={16} />
                 </button>
+                {nameWarningIndex === index && (
+                  <p className="field-warning" id={`setup-player-name-warning-${index}`} role="alert">
+                    {playerNameWarning}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -370,6 +414,9 @@ function Seat({
   mutateGame: (mutator: (current: GameState) => GameState) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState(player.name);
+  const [nameBaseline, setNameBaseline] = useState(player.name);
+  const [nameWarning, setNameWarning] = useState(false);
   const hand = game.hand;
   const layout = seatLayout(index, count);
   const isCurrent = hand?.currentActorId === player.id;
@@ -377,6 +424,25 @@ function Seat({
   const position = hand ? positionLabel(game, player) : "-";
   const streetBet = hand?.streetBets[player.id] ?? 0;
   const isButton = hand?.buttonSeat === player.seat;
+
+  useEffect(() => {
+    setNameDraft(player.name);
+    setNameBaseline(player.name);
+    setNameWarning(false);
+  }, [player.name]);
+
+  const finishSeatNameEdit = () => {
+    const nextName = nameDraft.trim();
+    if (!isValidPlayerName(nextName)) {
+      setNameDraft(nameBaseline);
+      setNameWarning(true);
+      return;
+    }
+    setNameWarning(false);
+    setNameDraft(nextName);
+    mutateGame((current) => updatePlayerName(current, player.id, nextName));
+  };
+
   return (
     <>
       {streetBet > 0 && <span className="seat-bet-chip" style={{ left: `${layout.betX}%`, top: `${layout.betY}%` }}>{formatBb(streetBet)}</span>}
@@ -390,12 +456,27 @@ function Seat({
           className="name-input"
           required
           minLength={1}
-          value={player.name}
+          aria-invalid={nameWarning}
+          aria-describedby={nameWarning ? `seat-name-warning-${player.id}` : undefined}
+          value={nameDraft}
+          onFocus={() => {
+            setNameBaseline(player.name);
+            setNameWarning(false);
+          }}
           onChange={(event) => {
-            if (!isValidPlayerName(event.target.value)) return;
-            mutateGame((current) => updatePlayerName(current, player.id, event.target.value));
+            setNameDraft(event.target.value);
+            if (nameWarning) setNameWarning(false);
+          }}
+          onBlur={finishSeatNameEdit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
           }}
         />
+        {nameWarning && (
+          <p className="seat-name-warning" id={`seat-name-warning-${player.id}`} role="alert">
+            {playerNameWarning}
+          </p>
+        )}
         <div className="chip-row">
           <span>{formatBb(player.stack)}</span>
           <strong className={player.profit >= 0 ? "profit-plus" : "profit-minus"}>{formatBb(player.profit, true)}</strong>

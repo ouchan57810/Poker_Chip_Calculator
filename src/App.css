@@ -178,6 +178,19 @@ select option {
   font-weight: 800;
 }
 
+.field-warning,
+.seat-name-warning {
+  margin: 0;
+  color: #f28482;
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.field-warning {
+  grid-column: 2 / 4;
+}
+
 .primary-button,
 .small-button,
 .icon-button,
@@ -451,6 +464,11 @@ select option {
   padding: 5px 6px;
   font-size: 0.76rem;
   font-weight: 800;
+}
+
+.seat-name-warning {
+  margin-top: 2px;
+  font-size: 0.52rem;
 }
 
 .chip-row {
