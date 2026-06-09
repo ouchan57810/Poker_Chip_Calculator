@@ -408,6 +408,15 @@ select option {
   min-height: 22px;
 }
 
+.seat-position-cluster {
+  min-width: 0;
+  max-width: calc(100% - 28px);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
 .seat-menu-button {
   flex: 0 0 auto;
   width: 24px;
@@ -428,7 +437,7 @@ select option {
 .position {
   display: inline-block;
   min-width: 0;
-  max-width: calc(100% - 28px);
+  max-width: 100%;
   color: #f6c85f;
   font-size: var(--seat-position-size);
   font-weight: 900;
@@ -1102,8 +1111,11 @@ select option {
     gap: 2px;
   }
 
-  .position {
+  .seat-position-cluster {
     max-width: calc(100% - 24px);
+  }
+
+  .position {
     line-height: 1;
   }
 
@@ -1255,11 +1267,12 @@ select option {
   }
 
   .dealer-marker {
-    left: 8px;
-    top: 1px;
+    position: static;
+    transform: none;
     width: 18px;
     height: 18px;
     font-size: 0.64rem;
+    flex: 0 0 auto;
   }
 }
 
@@ -1273,7 +1286,7 @@ select option {
   }
 
   .seat-bet-chip {
-    min-width: 38px;
+    min-width: 34px;
     max-width: 66px;
     padding: 2px 4px;
     font-size: 0.5rem;
@@ -1397,11 +1410,12 @@ select option {
   }
 
   .dealer-marker {
-    left: 7px;
-    top: 1px;
+    position: static;
+    transform: none;
     width: 16px;
     height: 16px;
     font-size: 0.56rem;
+    flex: 0 0 auto;
   }
 
   .seat-bet-chip {

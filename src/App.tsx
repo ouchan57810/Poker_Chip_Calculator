@@ -490,9 +490,11 @@ function Seat({
     <>
       {streetBet > 0 && <span className="seat-bet-chip" style={{ left: `${layout.betX}%`, top: `${layout.betY}%` }}>{formatBb(streetBet)}</span>}
       <article className={`seat ${isCurrent ? "current" : ""} ${isFolded ? "folded" : ""}`} style={{ left: `${layout.x}%`, top: `${layout.y}%` }}>
-        {isButton && <span className="dealer-marker">D</span>}
         <div className="seat-head">
-          <span className={`position ${positionClass(position)}`}>{position}</span>
+          <span className="seat-position-cluster">
+            {isButton && <span className="dealer-marker">D</span>}
+            <span className={`position ${positionClass(position)}`}>{position}</span>
+          </span>
           <button className="seat-menu-button" onClick={() => setOpen(true)} title="プレイヤー操作">
             <MoreHorizontal size={15} />
           </button>
@@ -889,6 +891,36 @@ interface SeatLayout {
 }
 
 const compactSeatPositions: Partial<Record<number, { x: number; y: number }[]>> = {
+  2: [
+    { x: 50, y: 14 },
+    { x: 50, y: 84 }
+  ],
+  3: [
+    { x: 50, y: 14 },
+    { x: 88, y: 67 },
+    { x: 12, y: 67 }
+  ],
+  4: [
+    { x: 50, y: 14 },
+    { x: 88, y: 45 },
+    { x: 50, y: 86 },
+    { x: 12, y: 45 }
+  ],
+  5: [
+    { x: 50, y: 14 },
+    { x: 88, y: 42 },
+    { x: 70, y: 80 },
+    { x: 30, y: 80 },
+    { x: 12, y: 42 }
+  ],
+  6: [
+    { x: 50, y: 14 },
+    { x: 87, y: 35 },
+    { x: 83, y: 68 },
+    { x: 50, y: 86 },
+    { x: 17, y: 68 },
+    { x: 13, y: 35 }
+  ],
   7: [
     { x: 50, y: 14 },
     { x: 78, y: 29 },
@@ -937,12 +969,12 @@ const landscapeSeatPositions: Partial<Record<number, { x: number; y: number }[]>
 
 const landscapeBetPositions: Partial<Record<number, { x: number; y: number }[]>> = {
   9: [
-    { x: 50, y: 34 },
+    { x: 50, y: 37 },
     { x: 62, y: 33 },
     { x: 72, y: 43 },
     { x: 70, y: 54 },
-    { x: 62, y: 58 },
-    { x: 38, y: 58 },
+    { x: 60, y: 58 },
+    { x: 40, y: 58 },
     { x: 30, y: 54 },
     { x: 28, y: 43 },
     { x: 38, y: 33 }
@@ -950,13 +982,62 @@ const landscapeBetPositions: Partial<Record<number, { x: number; y: number }[]>>
 };
 
 const compactBetPositions: Partial<Record<number, { x: number; y: number }[]>> = {
+  2: [
+    { x: 50, y: 29 },
+    { x: 50, y: 68 }
+  ],
+  3: [
+    { x: 50, y: 29 },
+    { x: 67, y: 60 },
+    { x: 33, y: 60 }
+  ],
+  4: [
+    { x: 50, y: 29 },
+    { x: 70, y: 45 },
+    { x: 50, y: 68 },
+    { x: 30, y: 45 }
+  ],
+  5: [
+    { x: 50, y: 29 },
+    { x: 70, y: 44 },
+    { x: 58, y: 64 },
+    { x: 42, y: 64 },
+    { x: 30, y: 44 }
+  ],
+  6: [
+    { x: 50, y: 29 },
+    { x: 70, y: 38 },
+    { x: 64, y: 58 },
+    { x: 50, y: 68 },
+    { x: 36, y: 58 },
+    { x: 30, y: 38 }
+  ],
+  7: [
+    { x: 50, y: 29 },
+    { x: 60, y: 38 },
+    { x: 66.2, y: 54 },
+    { x: 56, y: 63 },
+    { x: 44, y: 63 },
+    { x: 33.8, y: 54 },
+    { x: 40, y: 38 }
+  ],
+  8: [
+    { x: 50, y: 29 },
+    { x: 59, y: 35 },
+    { x: 69, y: 45 },
+    { x: 57, y: 59 },
+    { x: 50, y: 64 },
+    { x: 43, y: 59 },
+    { x: 31, y: 45 },
+    { x: 41, y: 35 }
+  ],
   9: [
     { x: 50, y: 26 },
     { x: 62, y: 33 },
     { x: 70, y: 48 },
     { x: 67, y: 64 },
-    { x: 56, y: 75 },
-    { x: 44, y: 75 },
+    { x: 56, y: 72 },
+    { x: 44, y: 72 },
     { x: 33, y: 64 },
     { x: 30, y: 48 },
     { x: 38, y: 33 }
