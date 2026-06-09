@@ -52,12 +52,15 @@ const modeDescriptions: Record<GameConfig["mode"], string> = {
 const isValidPlayerName = (name: string) => name.trim().length > 0;
 const playerNameWarning = "プレイヤー名は1文字以上で入力してください。";
 
+type TableLayoutMode = "compact" | "landscape" | "standard" | "wide";
+
 export default function App() {
   const [config, setConfig] = useState<GameConfig>(() => createDefaultConfig());
   const [game, setGame] = useState<GameState | undefined>(() => loadStoredGame());
   const [tab, setTab] = useState<TabKey>("table");
   const [undoStack, setUndoStack] = useState<GameState[]>([]);
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
+  const tableLayoutMode = useResponsiveTableLayoutMode();
 
   useEffect(() => {
     if (!game) return;
@@ -138,7 +141,7 @@ export default function App() {
       </header>
 
       <section className="content-panel">
-        {tab === "table" && <TableView game={game} mutateGame={mutateGame} advanceHand={advanceHand} undo={undo} canUndo={undoStack.length > 0} />}
+        {tab === "table" && <TableView game={game} mutateGame={mutateGame} advanceHand={advanceHand} undo={undo} canUndo={undoStack.length > 0} layoutMode={tableLayoutMode} />}
         {tab === "history" && <HistoryView game={game} />}
         {tab === "graph" && <GraphView game={game} />}
       </section>
@@ -151,6 +154,49 @@ export default function App() {
       {confirmEndOpen && <EndGameDialog onCancel={() => setConfirmEndOpen(false)} onConfirm={endGame} />}
     </main>
   );
+}
+
+function useResponsiveTableLayoutMode(): TableLayoutMode {
+  const [viewport, setViewport] = useState(() => getViewportSize());
+
+  useEffect(() => {
+    const updateViewport = () => {
+      const next = getViewportSize();
+      document.documentElement.style.setProperty("--app-width", `${next.width}px`);
+      document.documentElement.style.setProperty("--app-height", `${next.height}px`);
+      setViewport((current) => (current.width === next.width && current.height === next.height ? current : next));
+    };
+    const visualViewport = window.visualViewport;
+
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    window.addEventListener("orientationchange", updateViewport);
+    visualViewport?.addEventListener("resize", updateViewport);
+    visualViewport?.addEventListener("scroll", updateViewport);
+    const interval = window.setInterval(updateViewport, 500);
+
+    return () => {
+      window.removeEventListener("resize", updateViewport);
+      window.removeEventListener("orientationchange", updateViewport);
+      visualViewport?.removeEventListener("resize", updateViewport);
+      visualViewport?.removeEventListener("scroll", updateViewport);
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  if (viewport.width <= 480 && viewport.height > viewport.width) return "compact";
+  if (viewport.height <= 430) return "landscape";
+  if (viewport.width >= 1180) return "wide";
+  return "standard";
+}
+
+function getViewportSize() {
+  if (typeof window === "undefined") return { width: 1024, height: 768 };
+  const visualViewport = window.visualViewport;
+  return {
+    width: Math.round(visualViewport?.width ?? window.innerWidth),
+    height: Math.round(visualViewport?.height ?? window.innerHeight)
+  };
 }
 
 function SetupScreen({
@@ -349,13 +395,15 @@ function TableView({
   mutateGame,
   advanceHand,
   undo,
-  canUndo
+  canUndo,
+  layoutMode
 }: {
   game: GameState;
   mutateGame: (mutator: (current: GameState) => GameState) => void;
   advanceHand: () => void;
   undo: () => void;
   canUndo: boolean;
+  layoutMode: TableLayoutMode;
 }) {
   const hand = game.hand;
   const displayPots = hand?.displayPots ?? [];
@@ -386,7 +434,7 @@ function TableView({
             </div>
           )}
           {game.players.map((player, index) => (
-            <Seat key={player.id} player={player} index={index} count={game.players.length} game={game} mutateGame={mutateGame} />
+            <Seat key={player.id} player={player} index={index} count={game.players.length} game={game} mutateGame={mutateGame} layoutMode={layoutMode} />
           ))}
         </div>
       </div>
@@ -405,20 +453,22 @@ function Seat({
   index,
   count,
   game,
-  mutateGame
+  mutateGame,
+  layoutMode
 }: {
   player: PlayerState;
   index: number;
   count: number;
   game: GameState;
   mutateGame: (mutator: (current: GameState) => GameState) => void;
+  layoutMode: TableLayoutMode;
 }) {
   const [open, setOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState(player.name);
   const [nameBaseline, setNameBaseline] = useState(player.name);
   const [nameWarning, setNameWarning] = useState(false);
   const hand = game.hand;
-  const layout = seatLayout(index, count);
+  const layout = seatLayout(index, count, layoutMode);
   const isCurrent = hand?.currentActorId === player.id;
   const isFolded = hand?.foldedPlayerIds.includes(player.id);
   const position = hand ? positionLabel(game, player) : "-";
@@ -840,63 +890,86 @@ interface SeatLayout {
   betY: number;
 }
 
-const denseBetPositions: Record<number, { x: number; y: number }[]> = {
+const compactSeatPositions: Partial<Record<number, { x: number; y: number }[]>> = {
   7: [
-    { x: 50, y: 26 },
-    { x: 65, y: 34 },
-    { x: 67, y: 52 },
-    { x: 58, y: 71 },
-    { x: 42, y: 71 },
-    { x: 33, y: 52 },
-    { x: 35, y: 34 }
+    { x: 50, y: 14 },
+    { x: 78, y: 29 },
+    { x: 82, y: 56 },
+    { x: 62, y: 77 },
+    { x: 38, y: 77 },
+    { x: 18, y: 56 },
+    { x: 22, y: 29 }
   ],
   8: [
-    { x: 50, y: 26 },
-    { x: 65, y: 34 },
-    { x: 68, y: 50 },
-    { x: 62, y: 69 },
-    { x: 50, y: 74 },
-    { x: 38, y: 69 },
-    { x: 32, y: 50 },
-    { x: 35, y: 34 }
+    { x: 50, y: 13 },
+    { x: 75, y: 24 },
+    { x: 86, y: 45 },
+    { x: 73, y: 67 },
+    { x: 50, y: 79 },
+    { x: 27, y: 67 },
+    { x: 14, y: 45 },
+    { x: 25, y: 24 }
   ],
   9: [
-    { x: 50, y: 26 },
-    { x: 62, y: 32 },
-    { x: 69, y: 47 },
-    { x: 65, y: 65 },
-    { x: 56, y: 74 },
-    { x: 44, y: 74 },
-    { x: 35, y: 65 },
-    { x: 31, y: 47 },
-    { x: 38, y: 32 }
+    { x: 50, y: 11 },
+    { x: 73, y: 20 },
+    { x: 88, y: 43 },
+    { x: 82, y: 66 },
+    { x: 62, y: 84 },
+    { x: 38, y: 84 },
+    { x: 18, y: 66 },
+    { x: 12, y: 43 },
+    { x: 27, y: 20 }
   ]
 };
 
-function seatLayout(index: number, count: number): SeatLayout {
+const landscapeSeatPositions: Partial<Record<number, { x: number; y: number }[]>> = {
+  9: [
+    { x: 50, y: 12 },
+    { x: 72, y: 18 },
+    { x: 91, y: 36 },
+    { x: 82, y: 66 },
+    { x: 62, y: 83 },
+    { x: 38, y: 83 },
+    { x: 18, y: 66 },
+    { x: 9, y: 36 },
+    { x: 28, y: 18 }
+  ]
+};
+
+function seatLayout(index: number, count: number, mode: TableLayoutMode): SeatLayout {
+  const compactPosition = mode === "compact" ? compactSeatPositions[count]?.[index] : undefined;
+  if (compactPosition) return withBetTowardCenter(compactPosition.x, compactPosition.y, 0.52);
+
+  const landscapePosition = mode === "landscape" ? landscapeSeatPositions[count]?.[index] : undefined;
+  if (landscapePosition) return withBetTowardCenter(landscapePosition.x, landscapePosition.y, 0.68);
+
   const angle = -90 + (360 / count) * index;
   const dense = count >= 7;
-  const radiusX = dense ? 38 : 36;
-  const radiusY = dense ? 40 : 39;
+  const radii = layoutRadii(mode, dense);
   const radialX = Math.cos((angle * Math.PI) / 180);
   const radialY = Math.sin((angle * Math.PI) / 180);
-  const x = 50 + radiusX * radialX;
-  const y = 50 + radiusY * radialY;
-  const denseBet = denseBetPositions[count]?.[index];
-  return denseBet ? { x, y, betX: denseBet.x, betY: denseBet.y } : fromSeatCenter(x, y, 22);
+  const x = 50 + radii.seatX * radialX;
+  const y = 50 + radii.seatY * radialY;
+  return withBetTowardCenter(x, y, radii.betRatio);
 }
 
-function fromSeatCenter(x: number, y: number, betInset: number): SeatLayout {
-  const vx = x - 50;
-  const vy = y - 50;
-  const length = Math.max(1, Math.hypot(vx, vy));
-  const radialX = vx / length;
-  const radialY = vy / length;
+function layoutRadii(mode: TableLayoutMode, dense: boolean) {
+  if (mode === "wide") {
+    return { seatX: dense ? 36 : 34, seatY: dense ? 38 : 36, betRatio: 0.46 };
+  }
+  if (mode === "landscape") {
+    return { seatX: dense ? 40 : 37, seatY: dense ? 36 : 34, betRatio: 0.6 };
+  }
+  return { seatX: dense ? 38 : 36, seatY: dense ? 39 : 37, betRatio: 0.44 };
+}
+
+function withBetTowardCenter(x: number, y: number, centerRatio: number): SeatLayout {
   return {
     x,
     y,
-    betX: x - radialX * betInset,
-    betY: y - radialY * betInset
+    betX: x + (50 - x) * centerRatio,
+    betY: y + (50 - y) * centerRatio
   };
 }
 
