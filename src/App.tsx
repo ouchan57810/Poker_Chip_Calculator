@@ -890,69 +890,6 @@ interface SeatLayout {
   betY: number;
 }
 
-const compactSeatPositions: Partial<Record<number, { x: number; y: number }[]>> = {
-  2: [
-    { x: 50, y: 14 },
-    { x: 50, y: 84 }
-  ],
-  3: [
-    { x: 50, y: 14 },
-    { x: 88, y: 67 },
-    { x: 12, y: 67 }
-  ],
-  4: [
-    { x: 50, y: 14 },
-    { x: 88, y: 45 },
-    { x: 50, y: 86 },
-    { x: 12, y: 45 }
-  ],
-  5: [
-    { x: 50, y: 14 },
-    { x: 88, y: 42 },
-    { x: 70, y: 80 },
-    { x: 30, y: 80 },
-    { x: 12, y: 42 }
-  ],
-  6: [
-    { x: 50, y: 14 },
-    { x: 87, y: 35 },
-    { x: 83, y: 68 },
-    { x: 50, y: 86 },
-    { x: 17, y: 68 },
-    { x: 13, y: 35 }
-  ],
-  7: [
-    { x: 50, y: 14 },
-    { x: 78, y: 29 },
-    { x: 82, y: 56 },
-    { x: 62, y: 77 },
-    { x: 38, y: 77 },
-    { x: 18, y: 56 },
-    { x: 22, y: 29 }
-  ],
-  8: [
-    { x: 50, y: 13 },
-    { x: 75, y: 24 },
-    { x: 86, y: 45 },
-    { x: 73, y: 67 },
-    { x: 50, y: 79 },
-    { x: 27, y: 67 },
-    { x: 14, y: 45 },
-    { x: 25, y: 24 }
-  ],
-  9: [
-    { x: 50, y: 11 },
-    { x: 73, y: 20 },
-    { x: 88, y: 43 },
-    { x: 84, y: 64 },
-    { x: 64, y: 86 },
-    { x: 36, y: 86 },
-    { x: 16, y: 64 },
-    { x: 12, y: 43 },
-    { x: 27, y: 20 }
-  ]
-};
-
 const landscapeSeatPositions: Partial<Record<number, { x: number; y: number }[]>> = {
   9: [
     { x: 50, y: 12 },
@@ -981,76 +918,7 @@ const landscapeBetPositions: Partial<Record<number, { x: number; y: number }[]>>
   ]
 };
 
-const compactBetPositions: Partial<Record<number, { x: number; y: number }[]>> = {
-  2: [
-    { x: 50, y: 29 },
-    { x: 50, y: 68 }
-  ],
-  3: [
-    { x: 50, y: 29 },
-    { x: 67, y: 60 },
-    { x: 33, y: 60 }
-  ],
-  4: [
-    { x: 50, y: 29 },
-    { x: 70, y: 45 },
-    { x: 50, y: 68 },
-    { x: 30, y: 45 }
-  ],
-  5: [
-    { x: 50, y: 29 },
-    { x: 70, y: 44 },
-    { x: 58, y: 64 },
-    { x: 42, y: 64 },
-    { x: 30, y: 44 }
-  ],
-  6: [
-    { x: 50, y: 29 },
-    { x: 70, y: 38 },
-    { x: 64, y: 58 },
-    { x: 50, y: 68 },
-    { x: 36, y: 58 },
-    { x: 30, y: 38 }
-  ],
-  7: [
-    { x: 50, y: 29 },
-    { x: 60, y: 38 },
-    { x: 66.2, y: 54 },
-    { x: 56, y: 63 },
-    { x: 44, y: 63 },
-    { x: 33.8, y: 54 },
-    { x: 40, y: 38 }
-  ],
-  8: [
-    { x: 50, y: 29 },
-    { x: 59, y: 35 },
-    { x: 69, y: 45 },
-    { x: 57, y: 59 },
-    { x: 50, y: 64 },
-    { x: 43, y: 59 },
-    { x: 31, y: 45 },
-    { x: 41, y: 35 }
-  ],
-  9: [
-    { x: 50, y: 26 },
-    { x: 62, y: 33 },
-    { x: 70, y: 48 },
-    { x: 67, y: 64 },
-    { x: 56, y: 72 },
-    { x: 44, y: 72 },
-    { x: 33, y: 64 },
-    { x: 30, y: 48 },
-    { x: 38, y: 33 }
-  ]
-};
-
 function seatLayout(index: number, count: number, mode: TableLayoutMode): SeatLayout {
-  const compactPosition = mode === "compact" ? compactSeatPositions[count]?.[index] : undefined;
-  const compactBetPosition = mode === "compact" ? compactBetPositions[count]?.[index] : undefined;
-  if (compactPosition) {
-    return compactBetPosition ? { x: compactPosition.x, y: compactPosition.y, betX: compactBetPosition.x, betY: compactBetPosition.y } : withBetTowardCenter(compactPosition.x, compactPosition.y, 0.46);
-  }
-
   const landscapePosition = mode === "landscape" ? landscapeSeatPositions[count]?.[index] : undefined;
   const landscapeBetPosition = mode === "landscape" ? landscapeBetPositions[count]?.[index] : undefined;
   if (landscapePosition) {
@@ -1068,6 +936,9 @@ function seatLayout(index: number, count: number, mode: TableLayoutMode): SeatLa
 }
 
 function layoutRadii(mode: TableLayoutMode, dense: boolean) {
+  if (mode === "compact") {
+    return { seatX: 38.5, seatY: 39, betRatio: 0.52 };
+  }
   if (mode === "wide") {
     return { seatX: dense ? 36 : 34, seatY: dense ? 38 : 36, betRatio: 0.4 };
   }
