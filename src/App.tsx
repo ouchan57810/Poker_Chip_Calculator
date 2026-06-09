@@ -491,7 +491,7 @@ function Seat({
       {streetBet > 0 && <span className="seat-bet-chip" style={{ left: `${layout.betX}%`, top: `${layout.betY}%` }}>{formatBb(streetBet)}</span>}
       <article className={`seat ${isCurrent ? "current" : ""} ${isFolded ? "folded" : ""}`} style={{ left: `${layout.x}%`, top: `${layout.y}%` }}>
         <div className="seat-head">
-          <span className="seat-position-cluster">
+          <span className={`seat-position-cluster ${isButton ? "has-dealer" : ""}`}>
             {isButton && <span className="dealer-marker">D</span>}
             <span className={`position ${positionClass(position)}`}>{position}</span>
           </span>
@@ -788,7 +788,7 @@ function HandHistorySection({ title, eyebrow, entries }: { title: string; eyebro
 function GraphView({ game }: { game: GameState }) {
   const width = 680;
   const height = 330;
-  const margin = { left: 82, right: 24, top: 24, bottom: 54 };
+  const margin = { left: 108, right: 24, top: 24, bottom: 54 };
   const players = game.players;
   const snapshots = withOriginSnapshot(game);
   const values = snapshots.flatMap((snap) => Object.values(snap.profits));
@@ -817,7 +817,7 @@ function GraphView({ game }: { game: GameState }) {
         <>
           <svg className="profit-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="収支グラフ">
             <text className="axis-label" x={width / 2} y={height - 8} textAnchor="middle">Hand</text>
-            <text className="axis-label" x="22" y={height / 2} textAnchor="middle" transform={`rotate(-90 22 ${height / 2})`}>Profit(bb)</text>
+            <text className="axis-label" x="20" y={height / 2} textAnchor="middle" transform={`rotate(-90 20 ${height / 2})`}>Profit(bb)</text>
             <line className="axis-line" x1={margin.left} y1={height - margin.bottom} x2={width - margin.right} y2={height - margin.bottom} />
             <line className="axis-line" x1={margin.left} y1={margin.top} x2={margin.left} y2={height - margin.bottom} />
             {ticks.map((tick) => (

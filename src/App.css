@@ -7,6 +7,7 @@
   --seat-name-size: 0.76rem;
   --seat-chip-size: 0.82rem;
   --seat-position-size: 0.68rem;
+  --dealer-marker-size: 24px;
   --table-max-width: 1480px;
   --table-max-height: 720px;
   color: #eef4f3;
@@ -127,12 +128,14 @@ h2 {
 
 .setup-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(100px, 0.8fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+  align-items: start;
 }
 
-.mode-field {
-  align-self: start;
+.setup-grid input,
+.setup-grid select {
+  height: 38px;
 }
 
 label {
@@ -161,14 +164,33 @@ select option {
 
 .mode-description {
   color: #a9c6bc;
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.76rem;
+  font-weight: 400;
 }
 
 .players-editor {
   min-width: 0;
   display: grid;
   gap: 9px;
+}
+
+.players-editor .section-head {
+  align-items: flex-end;
+}
+
+.players-editor .eyebrow,
+.players-editor h2,
+.players-editor .small-button {
+  font-size: 0.76rem;
+}
+
+.players-editor .eyebrow {
+  font-weight: 400;
+}
+
+.players-editor h2,
+.players-editor .small-button {
+  font-weight: 800;
 }
 
 .player-name-list {
@@ -234,9 +256,32 @@ select option {
   color: #17201c;
 }
 
+.setup-board > .primary-button {
+  margin-block: 6px 4px;
+}
+
 .small-button {
   padding: 0 12px;
   background: rgba(132, 220, 198, 0.16);
+}
+
+@media (min-width: 641px) {
+  .setup-grid {
+    padding-bottom: 25px;
+  }
+
+  .mode-field {
+    position: relative;
+  }
+
+  .mode-description {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 5px);
+    width: max-content;
+    max-width: none;
+    white-space: nowrap;
+  }
 }
 
 .icon-button {
@@ -411,10 +456,14 @@ select option {
 .seat-position-cluster {
   min-width: 0;
   max-width: calc(100% - 28px);
-  position: relative;
+  position: static;
   display: inline-flex;
   align-items: center;
   gap: 3px;
+}
+
+.seat-position-cluster.has-dealer {
+  padding-left: calc(var(--dealer-marker-size) + 4px);
 }
 
 .seat-menu-button {
@@ -461,11 +510,11 @@ select option {
 
 .dealer-marker {
   position: absolute;
-  left: 0;
-  top: 0;
-  transform: translate(-50%, -50%);
-  width: 24px;
-  height: 24px;
+  left: var(--seat-padding);
+  top: var(--seat-padding);
+  transform: none;
+  width: var(--dealer-marker-size);
+  height: var(--dealer-marker-size);
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -1040,17 +1089,34 @@ select option {
 
   .players-editor .section-head {
     gap: 6px;
+    align-items: flex-end;
   }
 
   .players-editor .small-button {
     min-height: 34px;
     padding: 0 10px;
-    font-size: 0.78rem;
+    font-size: 0.68rem;
+    font-weight: 800;
   }
 
   label {
     gap: 3px;
     font-size: 0.68rem;
+  }
+
+  .mode-description,
+  .players-editor .eyebrow,
+  .players-editor h2 {
+    font-size: 0.68rem;
+  }
+
+  .mode-description,
+  .players-editor .eyebrow {
+    font-weight: 400;
+  }
+
+  .players-editor h2 {
+    font-weight: 800;
   }
 
   input,
@@ -1247,6 +1313,7 @@ select option {
     --seat-name-size: 0.53rem;
     --seat-chip-size: 0.6rem;
     --seat-position-size: 0.55rem;
+    --dealer-marker-size: 18px;
   }
 
   .setup-board {
@@ -1267,12 +1334,7 @@ select option {
   }
 
   .dealer-marker {
-    position: static;
-    transform: none;
-    width: 18px;
-    height: 18px;
     font-size: 0.64rem;
-    flex: 0 0 auto;
   }
 }
 
@@ -1314,6 +1376,7 @@ select option {
     --seat-name-size: 0.48rem;
     --seat-chip-size: 0.5rem;
     --seat-position-size: 0.48rem;
+    --dealer-marker-size: 16px;
     --table-max-width: 100%;
     --table-max-height: 100%;
   }
@@ -1392,10 +1455,6 @@ select option {
     height: 12px;
   }
 
-  .position {
-    max-width: calc(100% - 20px);
-  }
-
   .name-input {
     height: 17px;
     margin-top: 1px;
@@ -1410,12 +1469,7 @@ select option {
   }
 
   .dealer-marker {
-    position: static;
-    transform: none;
-    width: 16px;
-    height: 16px;
     font-size: 0.56rem;
-    flex: 0 0 auto;
   }
 
   .seat-bet-chip {
