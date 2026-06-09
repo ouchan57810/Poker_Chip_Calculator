@@ -7,7 +7,7 @@
   --seat-name-size: 0.76rem;
   --seat-chip-size: 0.82rem;
   --seat-position-size: 0.68rem;
-  --dealer-marker-size: 24px;
+  --dealer-marker-size: 18px;
   --table-max-width: 1480px;
   --table-max-height: 720px;
   color: #eef4f3;
@@ -548,6 +548,7 @@ select option {
   padding: 5px 6px;
   font-size: var(--seat-name-size);
   font-weight: 800;
+  text-align: center;
 }
 
 .seat-name-warning {
@@ -1016,6 +1017,7 @@ select option {
     --seat-name-size: 0.57rem;
     --seat-chip-size: 0.64rem;
     --seat-position-size: 0.58rem;
+    --dealer-marker-size: 16px;
     --table-max-width: 100%;
     --table-max-height: 100%;
   }
@@ -1236,6 +1238,10 @@ select option {
     font-size: 0.54rem;
   }
 
+  .dealer-marker {
+    font-size: 0.62rem;
+  }
+
   .right-rail,
   .history-view,
   .graph-view {
@@ -1313,7 +1319,7 @@ select option {
     --seat-name-size: 0.53rem;
     --seat-chip-size: 0.6rem;
     --seat-position-size: 0.55rem;
-    --dealer-marker-size: 18px;
+    --dealer-marker-size: 14px;
   }
 
   .setup-board {
@@ -1334,7 +1340,7 @@ select option {
   }
 
   .dealer-marker {
-    font-size: 0.64rem;
+    font-size: 0.56rem;
   }
 }
 
@@ -1376,7 +1382,7 @@ select option {
     --seat-name-size: 0.48rem;
     --seat-chip-size: 0.5rem;
     --seat-position-size: 0.48rem;
-    --dealer-marker-size: 16px;
+    --dealer-marker-size: 12px;
     --table-max-width: 100%;
     --table-max-height: 100%;
   }
