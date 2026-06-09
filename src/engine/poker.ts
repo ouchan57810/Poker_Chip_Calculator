@@ -70,22 +70,23 @@ export function reviveGameState(raw: string): GameState | undefined {
   }
 }
 
-export function startHand(game: GameState, buttonSeat = nextActiveSeat(game.players, game.buttonSeat - 1)): GameState {
+export function startHand(game: GameState, buttonSeat?: number): GameState {
   const players = removePendingPlayers(applyPendingStatuses(game.players)).map((player) => {
     if (game.config.mode === "fixed" && player.status === "active") {
       return { ...player, stack: game.config.startingStack };
     }
     return player;
   });
-  const activePlayers = players.filter((player) => player.status === "active");
+  const activePlayers = handEligiblePlayers(players);
   if (activePlayers.length < 2) {
     return { ...game, players, hand: undefined, lastSettlement: undefined, lastHeartbeatAt: Date.now() };
   }
 
-  const resolvedButton = normalizeButtonSeat(players, buttonSeat);
+  const requestedButtonSeat = buttonSeat ?? nextEligibleSeat(players, game.buttonSeat - 1);
+  const resolvedButton = normalizeButtonSeat(players, requestedButtonSeat);
   const isHeadsUp = activePlayers.length === 2;
-  const smallBlindSeat = isHeadsUp ? resolvedButton : nextActiveSeat(players, resolvedButton);
-  const bigBlindSeat = nextActiveSeat(players, smallBlindSeat);
+  const smallBlindSeat = isHeadsUp ? resolvedButton : nextEligibleSeat(players, resolvedButton);
+  const bigBlindSeat = nextEligibleSeat(players, smallBlindSeat);
   const handNumber = game.handNumber + 1;
   const activePlayerIds = activePlayers.map((player) => player.id);
   const blankAmounts = Object.fromEntries(activePlayers.map((player) => [player.id, 0]));
@@ -99,20 +100,20 @@ export function startHand(game: GameState, buttonSeat = nextActiveSeat(game.play
 
   const postBlind = (seat: number, blindAmount: number, label: string) => {
     const player = nextPlayers.find((candidate) => candidate.seat === seat);
-    if (!player || player.status !== "active") return;
+    if (!player || !activePlayerIds.includes(player.id)) return;
     const amount = Math.min(player.stack, blindAmount);
     nextPlayers = moveChips(nextPlayers, player.id, -amount);
     streetBets = { ...streetBets, [player.id]: amount };
     committed = { ...committed, [player.id]: amount };
     handNet = { ...handNet, [player.id]: (handNet[player.id] ?? 0) - amount };
     if (amount > 0 && amount === player.stack) allInPlayerIds.push(player.id);
-    actionLog.push(logEntry(handNumber, "preflop", player, positionForSeat(players, resolvedButton, player.seat), label, amount));
+    actionLog.push(logEntry(handNumber, "preflop", player, positionForSeat(players, resolvedButton, player.seat, activePlayerIds), label, amount));
   };
 
   postBlind(smallBlindSeat, SB, "SB");
   postBlind(bigBlindSeat, BB_UNIT, "BB");
 
-  const firstActorSeat = isHeadsUp ? smallBlindSeat : nextActiveSeat(nextPlayers, bigBlindSeat);
+  const firstActorSeat = isHeadsUp ? smallBlindSeat : nextEligibleSeat(nextPlayers, bigBlindSeat);
   const firstActor = nextPlayers.find((player) => player.seat === firstActorSeat && player.status === "active" && player.stack > 0);
   const pots = buildPotsFromState(committed, [], allInPlayerIds, game.config.rakePercent, game.config.rakeCap);
   const hand: HandState = {
@@ -220,18 +221,18 @@ export function applyAction(game: GameState, action: PlayerAction): GameState {
 
   if (action.type === "fold" && available.canFold) {
     nextHand.foldedPlayerIds = unique([...nextHand.foldedPlayerIds, player.id]);
-    nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat), "Fold"));
+    nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat, nextHand.activePlayerIds), "Fold"));
     markActed();
   }
 
   if (action.type === "check" && available.canCheck) {
-    nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat), "Check"));
+    nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat, nextHand.activePlayerIds), "Check"));
     markActed();
   }
 
   if (action.type === "call" && available.canCall) {
     const { delta, allIn } = commit(streetBet + callAmount);
-    nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat), allIn ? "Call All in" : "Call", delta));
+    nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat, nextHand.activePlayerIds), allIn ? "Call All in" : "Call", delta));
     markActed();
   }
 
@@ -249,7 +250,7 @@ export function applyAction(game: GameState, action: PlayerAction): GameState {
     } else {
       markActed();
     }
-    nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat), allIn ? "Bet All in" : "Bet", boundedTotal));
+    nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat, nextHand.activePlayerIds), allIn ? "Bet All in" : "Bet", boundedTotal));
   }
 
   if (action.type === "raise" && available.canRaise) {
@@ -272,7 +273,7 @@ export function applyAction(game: GameState, action: PlayerAction): GameState {
     } else {
       markActed();
     }
-    nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat), allIn ? "Raise All in" : "Raise", boundedTotal));
+    nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat, nextHand.activePlayerIds), allIn ? "Raise All in" : "Raise", boundedTotal));
   }
 
   if (action.type === "allIn") {
@@ -290,7 +291,7 @@ export function applyAction(game: GameState, action: PlayerAction): GameState {
       } else {
         markActed();
       }
-      nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat), "Bet All in", boundedTotal));
+      nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat, nextHand.activePlayerIds), "Bet All in", boundedTotal));
     } else if (boundedTotal > previousBet) {
       nextHand.currentBet = boundedTotal;
       const raiseSize = boundedTotal - previousBet;
@@ -305,9 +306,9 @@ export function applyAction(game: GameState, action: PlayerAction): GameState {
       } else {
         markActed();
       }
-      nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat), "Raise All in", boundedTotal));
+      nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat, nextHand.activePlayerIds), "Raise All in", boundedTotal));
     } else {
-      nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat), "Call All in", boundedTotal - streetBet));
+      nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(players, nextHand.buttonSeat, player.seat, nextHand.activePlayerIds), "Call All in", boundedTotal - streetBet));
       markActed();
     }
   }
@@ -380,7 +381,7 @@ export function removePlayerFromGame(game: GameState, playerId: string): GameSta
   if (!nextHand.allInPlayerIds.includes(playerId)) {
     nextHand.foldedPlayerIds = unique([...nextHand.foldedPlayerIds, playerId]);
     nextHand.actedPlayerIds = unique([...nextHand.actedPlayerIds, playerId]);
-    nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(game.players, nextHand.buttonSeat, player.seat), "Fold"));
+    nextHand.actionLog.push(logEntry(nextHand.handNumber, nextHand.street, player, positionForSeat(game.players, nextHand.buttonSeat, player.seat, nextHand.activePlayerIds), "Fold"));
   }
   nextHand.canRaisePlayerIds = nextHand.canRaisePlayerIds.filter((id) => id !== playerId);
   nextHand.currentActorId = nextHand.currentActorId === playerId ? undefined : nextHand.currentActorId;
@@ -396,8 +397,10 @@ export function resetToSetup(game: GameState): GameState {
   return { ...game, hand: undefined, lastHeartbeatAt: 0 };
 }
 
-export function positionForSeat(players: PlayerState[], buttonSeat: number, seat: number): string {
-  const active = players.filter((player) => player.status === "active" && !player.pendingRemoval).sort((a, b) => a.seat - b.seat);
+export function positionForSeat(players: PlayerState[], buttonSeat: number, seat: number, activePlayerIds?: string[]): string {
+  const active = players
+    .filter((player) => (activePlayerIds ? activePlayerIds.includes(player.id) : player.status === "active" && !player.pendingRemoval))
+    .sort((a, b) => a.seat - b.seat);
   const count = active.length;
   if (count === 0) return "-";
   if (count === 2) {
@@ -603,7 +606,7 @@ function firstPostflopActor(players: PlayerState[], hand: HandState, liveIds: st
 function bettingPlayerIds(players: PlayerState[], hand: HandState): string[] {
   return hand.activePlayerIds.filter((id) => {
     const player = players.find((candidate) => candidate.id === id);
-    return Boolean(player && player.status === "active" && !player.pendingRemoval && !hand.foldedPlayerIds.includes(id) && !hand.allInPlayerIds.includes(id));
+    return Boolean(player && player.status === "active" && player.stack > 0 && !player.pendingRemoval && !hand.foldedPlayerIds.includes(id) && !hand.allInPlayerIds.includes(id));
   });
 }
 
@@ -631,12 +634,19 @@ function removePendingPlayers(players: PlayerState[]): PlayerState[] {
 }
 
 function normalizeButtonSeat(players: PlayerState[], requestedSeat: number): number {
-  const requested = players.find((player) => player.seat === requestedSeat && player.status === "active" && !player.pendingRemoval);
-  return requested ? requested.seat : nextActiveSeat(players, requestedSeat - 1);
+  const requested = players.find((player) => player.seat === requestedSeat && isHandEligible(player));
+  return requested ? requested.seat : nextEligibleSeat(players, requestedSeat - 1);
 }
 
 function nextActiveSeat(players: PlayerState[], fromSeat: number): number {
   const active = players.filter((player) => player.status === "active" && !player.pendingRemoval).sort((a, b) => a.seat - b.seat);
+  if (active.length === 0) return 0;
+  const candidate = active.find((player) => player.seat > fromSeat);
+  return candidate?.seat ?? active[0].seat;
+}
+
+function nextEligibleSeat(players: PlayerState[], fromSeat: number): number {
+  const active = handEligiblePlayers(players);
   if (active.length === 0) return 0;
   const candidate = active.find((player) => player.seat > fromSeat);
   return candidate?.seat ?? active[0].seat;
@@ -649,6 +659,14 @@ function orderedSeatsAfterButton(players: PlayerState[], buttonSeat: number): nu
 function orderedSeatsAfter(players: PlayerState[], seat: number): number[] {
   const activeSeats = players.filter((player) => player.status === "active" && !player.pendingRemoval).map((player) => player.seat).sort((a, b) => a - b);
   return [...activeSeats.filter((candidate) => candidate > seat), ...activeSeats.filter((candidate) => candidate <= seat)];
+}
+
+function handEligiblePlayers(players: PlayerState[]): PlayerState[] {
+  return players.filter(isHandEligible).sort((a, b) => a.seat - b.seat);
+}
+
+function isHandEligible(player: PlayerState): boolean {
+  return player.status === "active" && player.stack > 0 && !player.pendingRemoval;
 }
 
 function playerSeat(players: PlayerState[], playerId: string): number {

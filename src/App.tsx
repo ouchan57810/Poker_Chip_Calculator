@@ -409,30 +409,23 @@ function TableView({
   const displayPots = hand?.displayPots ?? [];
   const mainPot = displayPots[0];
   const sidePots = displayPots.slice(1);
-  const topSidePots = sidePots.length >= 5 ? sidePots.slice(0, Math.max(0, sidePots.length - 4)) : [];
-  const bottomSidePots = sidePots.length >= 5 ? sidePots.slice(Math.max(0, sidePots.length - 4)) : sidePots;
   return (
     <div className="table-layout">
       <div className="poker-table">
         <div className="felt">
-          <div className="pot-display">
-            <span>Pot</span>
-            <strong>{formatBb(mainPot ? mainPot.amount - mainPot.rake : 0)}</strong>
+          <div className="pot-cluster">
+            {sidePots.length > 0 && (
+              <div className="side-pot-stack">
+                {sidePots.map((pot) => (
+                  <span key={pot.id}>{pot.label}: {formatBb(pot.amount - pot.rake)}</span>
+                ))}
+              </div>
+            )}
+            <div className="pot-display">
+              <span>Pot</span>
+              <strong>{formatBb(mainPot ? mainPot.amount - mainPot.rake : 0)}</strong>
+            </div>
           </div>
-          {topSidePots.length > 0 && (
-            <div className="side-pot-stack side-pot-top">
-              {topSidePots.map((pot) => (
-                <span key={pot.id}>{pot.label}: {formatBb(pot.amount - pot.rake)}</span>
-              ))}
-            </div>
-          )}
-          {bottomSidePots.length > 0 && (
-            <div className="side-pot-stack side-pot-bottom">
-              {bottomSidePots.map((pot) => (
-              <span key={pot.id}>{pot.label}: {formatBb(pot.amount - pot.rake)}</span>
-              ))}
-            </div>
-          )}
           {game.players.map((player, index) => (
             <Seat key={player.id} player={player} index={index} count={game.players.length} game={game} mutateGame={mutateGame} layoutMode={layoutMode} />
           ))}
@@ -498,10 +491,12 @@ function Seat({
       {streetBet > 0 && <span className="seat-bet-chip" style={{ left: `${layout.betX}%`, top: `${layout.betY}%` }}>{formatBb(streetBet)}</span>}
       <article className={`seat ${isCurrent ? "current" : ""} ${isFolded ? "folded" : ""}`} style={{ left: `${layout.x}%`, top: `${layout.y}%` }}>
         {isButton && <span className="dealer-marker">D</span>}
-        <button className="seat-menu-button" onClick={() => setOpen(true)} title="プレイヤー操作">
-          <MoreHorizontal size={15} />
-        </button>
-        <span className={`position ${positionClass(position)}`}>{position}</span>
+        <div className="seat-head">
+          <span className={`position ${positionClass(position)}`}>{position}</span>
+          <button className="seat-menu-button" onClick={() => setOpen(true)} title="プレイヤー操作">
+            <MoreHorizontal size={15} />
+          </button>
+        </div>
         <input
           className="name-input"
           required
@@ -624,11 +619,13 @@ function ActionPanel({
 
   return (
     <div className="action-panel">
+      <div className="action-panel-toolbar">
+        {canSize && <span>{available.canBet ? "Bet" : "Raise"} {formatBb(boundedAmount)}</span>}
+        <button type="button" className="undo-text-button" onClick={undo} disabled={!canUndo}>一つ戻す</button>
+      </div>
       {canSize && (
         <>
           <label className="range-row">
-            <span>{available.canBet ? "Bet" : "Raise"} {formatBb(boundedAmount)}</span>
-            <button type="button" className="undo-text-button" onClick={undo} disabled={!canUndo}>一つ戻す</button>
             <input type="range" min={min} max={max} step={BB_UNIT / 10} value={boundedAmount} onChange={(event) => { setAmount(Number(event.target.value)); setSelectedShortcut("custom"); }} />
           </label>
           <div className="shortcut-grid">
@@ -859,7 +856,8 @@ function TabButton({ active, onClick, label }: { active: boolean; onClick: () =>
 function positionLabel(game: GameState, player: PlayerState): string {
   const hand = game.hand;
   if (!hand) return "-";
-  const active = game.players.filter((candidate) => candidate.status === "active" && !candidate.pendingRemoval).sort((a, b) => a.seat - b.seat);
+  const active = game.players.filter((candidate) => hand.activePlayerIds.includes(candidate.id)).sort((a, b) => a.seat - b.seat);
+  if (!hand.activePlayerIds.includes(player.id)) return "-";
   if (active.length === 2) return player.seat === hand.buttonSeat ? "SB" : "BB";
   const buttonIndex = active.findIndex((candidate) => candidate.seat === hand.buttonSeat);
   const playerIndex = active.findIndex((candidate) => candidate.id === player.id);
@@ -914,10 +912,10 @@ const compactSeatPositions: Partial<Record<number, { x: number; y: number }[]>> 
     { x: 50, y: 11 },
     { x: 73, y: 20 },
     { x: 88, y: 43 },
-    { x: 82, y: 66 },
-    { x: 62, y: 84 },
-    { x: 38, y: 84 },
-    { x: 18, y: 66 },
+    { x: 84, y: 64 },
+    { x: 64, y: 86 },
+    { x: 36, y: 86 },
+    { x: 16, y: 64 },
     { x: 12, y: 43 },
     { x: 27, y: 20 }
   ]
@@ -937,12 +935,46 @@ const landscapeSeatPositions: Partial<Record<number, { x: number; y: number }[]>
   ]
 };
 
+const landscapeBetPositions: Partial<Record<number, { x: number; y: number }[]>> = {
+  9: [
+    { x: 50, y: 34 },
+    { x: 62, y: 33 },
+    { x: 72, y: 43 },
+    { x: 70, y: 54 },
+    { x: 62, y: 58 },
+    { x: 38, y: 58 },
+    { x: 30, y: 54 },
+    { x: 28, y: 43 },
+    { x: 38, y: 33 }
+  ]
+};
+
+const compactBetPositions: Partial<Record<number, { x: number; y: number }[]>> = {
+  9: [
+    { x: 50, y: 26 },
+    { x: 62, y: 33 },
+    { x: 70, y: 48 },
+    { x: 67, y: 64 },
+    { x: 56, y: 75 },
+    { x: 44, y: 75 },
+    { x: 33, y: 64 },
+    { x: 30, y: 48 },
+    { x: 38, y: 33 }
+  ]
+};
+
 function seatLayout(index: number, count: number, mode: TableLayoutMode): SeatLayout {
   const compactPosition = mode === "compact" ? compactSeatPositions[count]?.[index] : undefined;
-  if (compactPosition) return withBetTowardCenter(compactPosition.x, compactPosition.y, 0.52);
+  const compactBetPosition = mode === "compact" ? compactBetPositions[count]?.[index] : undefined;
+  if (compactPosition) {
+    return compactBetPosition ? { x: compactPosition.x, y: compactPosition.y, betX: compactBetPosition.x, betY: compactBetPosition.y } : withBetTowardCenter(compactPosition.x, compactPosition.y, 0.46);
+  }
 
   const landscapePosition = mode === "landscape" ? landscapeSeatPositions[count]?.[index] : undefined;
-  if (landscapePosition) return withBetTowardCenter(landscapePosition.x, landscapePosition.y, 0.68);
+  const landscapeBetPosition = mode === "landscape" ? landscapeBetPositions[count]?.[index] : undefined;
+  if (landscapePosition) {
+    return landscapeBetPosition ? { x: landscapePosition.x, y: landscapePosition.y, betX: landscapeBetPosition.x, betY: landscapeBetPosition.y } : withBetTowardCenter(landscapePosition.x, landscapePosition.y, 0.48);
+  }
 
   const angle = -90 + (360 / count) * index;
   const dense = count >= 7;
@@ -956,12 +988,12 @@ function seatLayout(index: number, count: number, mode: TableLayoutMode): SeatLa
 
 function layoutRadii(mode: TableLayoutMode, dense: boolean) {
   if (mode === "wide") {
-    return { seatX: dense ? 36 : 34, seatY: dense ? 38 : 36, betRatio: 0.46 };
+    return { seatX: dense ? 36 : 34, seatY: dense ? 38 : 36, betRatio: 0.4 };
   }
   if (mode === "landscape") {
-    return { seatX: dense ? 40 : 37, seatY: dense ? 36 : 34, betRatio: 0.6 };
+    return { seatX: dense ? 40 : 37, seatY: dense ? 36 : 34, betRatio: 0.48 };
   }
-  return { seatX: dense ? 38 : 36, seatY: dense ? 39 : 37, betRatio: 0.44 };
+  return { seatX: dense ? 38 : 36, seatY: dense ? 39 : 37, betRatio: 0.38 };
 }
 
 function withBetTowardCenter(x: number, y: number, centerRatio: number): SeatLayout {

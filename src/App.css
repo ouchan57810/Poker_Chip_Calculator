@@ -325,11 +325,20 @@ select option {
   overflow: visible;
 }
 
-.pot-display {
+.pot-cluster {
   position: absolute;
   left: 50%;
-  top: 48%;
+  top: 49%;
   transform: translate(-50%, -50%);
+  min-width: 118px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  z-index: 1;
+}
+
+.pot-display {
   display: grid;
   place-items: center;
   min-width: 118px;
@@ -337,7 +346,6 @@ select option {
   border-radius: 8px;
   background: rgba(10, 19, 20, 0.76);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  z-index: 1;
 }
 
 .pot-display span {
@@ -351,23 +359,11 @@ select option {
 }
 
 .side-pot-stack {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(44%, 230px);
+  width: min(58vw, 250px);
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
   gap: 4px;
-  z-index: 1;
-}
-
-.side-pot-top {
-  top: 35%;
-}
-
-.side-pot-bottom {
-  top: 60%;
 }
 
 .side-pot-stack span {
@@ -404,10 +400,16 @@ select option {
   opacity: 0.62;
 }
 
+.seat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-height: 22px;
+}
+
 .seat-menu-button {
-  position: absolute;
-  right: 4px;
-  top: 4px;
+  flex: 0 0 auto;
   width: 24px;
   height: 22px;
   padding: 0;
@@ -425,10 +427,15 @@ select option {
 
 .position {
   display: inline-block;
+  min-width: 0;
   max-width: calc(100% - 28px);
   color: #f6c85f;
   font-size: var(--seat-position-size);
   font-weight: 900;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pos-bb {
@@ -535,30 +542,36 @@ select option {
   width: 100%;
 }
 
-.range-row {
+.action-panel-toolbar {
+  min-height: 30px;
+  display: grid;
   grid-template-columns: 1fr auto 1fr;
-  gap: 7px;
   align-items: center;
+  gap: 7px;
 }
 
-.range-row span {
+.action-panel-toolbar span {
   grid-column: 1 / -1;
   grid-row: 1;
-  text-align: center;
   color: #f6c85f;
   font-size: 0.92rem;
   font-weight: 900;
+  text-align: center;
 }
 
-.range-row .undo-text-button {
+.action-panel-toolbar .undo-text-button {
   grid-column: 3;
   grid-row: 1;
   justify-self: end;
   z-index: 1;
 }
 
+.range-row {
+  gap: 0;
+  align-items: center;
+}
+
 .range-row input {
-  grid-column: 1 / -1;
   padding: 0;
 }
 
@@ -940,10 +953,10 @@ select option {
 @media (max-width: 640px) {
   :root {
     --seat-width: 82px;
-    --seat-min-height: 68px;
+    --seat-min-height: 72px;
     --seat-padding: 4px;
-    --seat-name-size: 0.58rem;
-    --seat-chip-size: 0.68rem;
+    --seat-name-size: 0.57rem;
+    --seat-chip-size: 0.64rem;
     --seat-position-size: 0.58rem;
     --table-max-width: 100%;
     --table-max-height: 100%;
@@ -1079,25 +1092,34 @@ select option {
   }
 
   .seat-menu-button {
+    flex-basis: 20px;
     width: 22px;
     height: 20px;
   }
 
+  .seat-head {
+    min-height: 18px;
+    gap: 2px;
+  }
+
   .position {
     max-width: calc(100% - 24px);
+    line-height: 1;
   }
 
   .name-input {
     margin-top: 2px;
-    height: 22px;
+    height: 20px;
     padding: 3px 4px;
+    line-height: 1;
   }
 
   .chip-row {
-    flex-direction: row;
+    flex-direction: column;
     justify-content: center;
     margin-top: 2px;
-    gap: 4px;
+    gap: 1px;
+    line-height: 1;
   }
 
   .chip-row span,
@@ -1115,21 +1137,18 @@ select option {
   }
 
   .side-pot-stack {
-    width: 48%;
-    gap: 3px;
+    width: 140px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
   }
 
   .side-pot-stack span {
-    padding: 3px 5px;
-    font-size: 0.52rem;
-  }
-
-  .side-pot-top {
-    top: 35%;
-  }
-
-  .side-pot-bottom {
-    top: 61%;
+    width: fit-content;
+    max-width: 100%;
+    justify-self: center;
+    padding: 2px 6px;
+    font-size: 0.5rem;
   }
 
   .seat-bet-chip {
@@ -1151,6 +1170,15 @@ select option {
 
   .action-panel {
     gap: 5px;
+  }
+
+  .action-panel-toolbar {
+    min-height: 29px;
+    gap: 4px;
+  }
+
+  .action-panel-toolbar span {
+    font-size: 0.8rem;
   }
 
   .range-row {
@@ -1201,11 +1229,11 @@ select option {
 
 @media (max-width: 430px) {
   :root {
-    --seat-width: 76px;
-    --seat-min-height: 62px;
+    --seat-width: 78px;
+    --seat-min-height: 70px;
     --seat-padding: 4px;
-    --seat-name-size: 0.54rem;
-    --seat-chip-size: 0.64rem;
+    --seat-name-size: 0.53rem;
+    --seat-chip-size: 0.6rem;
     --seat-position-size: 0.55rem;
   }
 
@@ -1222,8 +1250,6 @@ select option {
   }
 
   .seat-menu-button {
-    right: 3px;
-    top: 3px;
     width: 19px;
     height: 18px;
   }
@@ -1239,16 +1265,16 @@ select option {
 
 @media (max-width: 390px) {
   :root {
-    --seat-width: 72px;
-    --seat-min-height: 60px;
-    --seat-name-size: 0.52rem;
-    --seat-chip-size: 0.61rem;
+    --seat-width: 76px;
+    --seat-min-height: 68px;
+    --seat-name-size: 0.51rem;
+    --seat-chip-size: 0.58rem;
     --seat-position-size: 0.52rem;
   }
 
   .seat-bet-chip {
-    min-width: 34px;
-    max-width: 54px;
+    min-width: 38px;
+    max-width: 66px;
     padding: 2px 4px;
     font-size: 0.5rem;
   }
@@ -1269,11 +1295,11 @@ select option {
 
 @media (max-height: 430px) {
   :root {
-    --seat-width: 66px;
-    --seat-min-height: 48px;
+    --seat-width: 70px;
+    --seat-min-height: 58px;
     --seat-padding: 4px;
     --seat-name-size: 0.48rem;
-    --seat-chip-size: 0.52rem;
+    --seat-chip-size: 0.5rem;
     --seat-position-size: 0.48rem;
     --table-max-width: 100%;
     --table-max-height: 100%;
@@ -1317,16 +1343,35 @@ select option {
     border-width: 7px;
   }
 
+  .pot-cluster {
+    top: 61.5%;
+    gap: 3px;
+  }
+
+  .side-pot-stack {
+    width: min(225px, 58vw);
+    display: flex;
+    gap: 2px;
+  }
+
+  .side-pot-stack span {
+    padding: 2px 5px;
+    font-size: 0.46rem;
+  }
+
   .seat {
     border-radius: 6px;
   }
 
   .seat-menu-button {
-    right: 3px;
-    top: 3px;
+    flex-basis: 17px;
     width: 17px;
     height: 16px;
     border-radius: 5px;
+  }
+
+  .seat-head {
+    min-height: 15px;
   }
 
   .seat-menu-button svg {
@@ -1346,8 +1391,8 @@ select option {
   }
 
   .chip-row {
-    flex-direction: row;
-    gap: 3px;
+    flex-direction: column;
+    gap: 1px;
     margin-top: 1px;
   }
 
@@ -1376,7 +1421,11 @@ select option {
     gap: 4px;
   }
 
-  .range-row span {
+  .action-panel-toolbar {
+    min-height: 26px;
+  }
+
+  .action-panel-toolbar span {
     font-size: 0.68rem;
   }
 

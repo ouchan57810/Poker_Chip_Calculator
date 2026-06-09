@@ -201,6 +201,23 @@ describe("Texas Hold'em engine", () => {
     expect(game.players.find((player) => player.id === "p-2")!.profit).toBe(profitBefore);
   });
 
+  it("skips active players with no chips when starting the next cash hand", () => {
+    let game = fixedButtonGame(["A", "B", "C"]);
+    game = {
+      ...game,
+      players: game.players.map((player) => (player.id === "p-1" ? { ...player, stack: 0 } : player)),
+      hand: game.hand ? { ...game.hand, street: "complete", currentActorId: undefined } : game.hand
+    };
+
+    game = startNextHand(game);
+    const available = deriveAvailableActions(game);
+
+    expect(game.players.find((player) => player.id === "p-1")?.status).toBe("active");
+    expect(game.hand?.activePlayerIds).toEqual(["p-2", "p-3"]);
+    expect(game.hand?.currentActorId).not.toBe("p-1");
+    expect(available.playerId).not.toBe("p-1");
+  });
+
   it("stores the completed action log when starting the next hand", () => {
     let game = fixedButtonGame();
     game = applyAction(game, { type: "fold" });
